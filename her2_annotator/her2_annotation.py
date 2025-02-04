@@ -31,7 +31,7 @@ label_colors = {
     2: (255, 255, 0),     # Yellow
     3: (0, 128, 0),       # Green
     4: (0, 0, 255),       # Blue
-    5: (128, 0, 128)      # Purple
+    5: (128, 128, 128)    # Gray
 }
 actions = ['Agregar', 'Borrar']
 
