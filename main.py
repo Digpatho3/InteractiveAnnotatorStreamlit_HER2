@@ -1,4 +1,7 @@
 import streamlit as st
+import sys
+import os
+from pathlib import Path
 
 from ki67_annotator.ki67_annotation import image_ann as ki67_image_ann
 from her2_annotator.her2_annotation import image_ann as her2_image_ann
@@ -36,4 +39,7 @@ def main():
         st.warning("Esta aplicación aún no está disponible.")
 
 if __name__ == "__main__":
+    script_dir = Path(__file__).parent.absolute()
+    sys.path.append(str(script_dir))
+    os.chdir(script_dir)
     main()

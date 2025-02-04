@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 # Folders
-MODULE_DIR = Path(__file__).parent
+MODULE_DIR = Path(__file__).parent.absolute()
 DATA_DIR = MODULE_DIR / "data"
 IMAGE_DIR = DATA_DIR / "images"
 ANN_DIR = DATA_DIR / "annotations"
@@ -19,6 +19,9 @@ LOG_FILE = DATA_DIR / "latest_session.log"
 
 # Create all directories
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+ANN_DIR.mkdir(parents=True, exist_ok=True)
+REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Define label list
 label_list = ['Positivo', 'Negativo', 'No importante']
