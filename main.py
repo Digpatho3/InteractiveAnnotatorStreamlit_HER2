@@ -13,7 +13,7 @@ st.set_page_config(page_title=None, page_icon=None, layout="wide", initial_sideb
 def main():
     st.sidebar.header("Seleccionar aplicación")
     with st.sidebar:
-        selected_app = st.selectbox("Aplicación:", app_list[1])
+        selected_app = st.selectbox("Aplicación:", app_list)
         st.session_state['Application'] = selected_app
 
     if selected_app == app_list[0]:
