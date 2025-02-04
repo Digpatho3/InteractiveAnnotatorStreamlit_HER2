@@ -7,26 +7,33 @@ from PIL import Image, ImageDraw
 import numpy as np
 import pandas as pd
 import os
+from pathlib import Path
 
 # Folders
-image_dir  = "./estr_annotator/images"
-ann_dir    = "./estr_annotator/annotations"
-report_dir = "./estr_annotator/reports"
+MODULE_DIR = Path(__file__).parent
+DATA_DIR = MODULE_DIR / "data"
+IMAGE_DIR = DATA_DIR / "images"
+ANN_DIR = DATA_DIR / "annotations"
+REPORT_DIR = DATA_DIR / "reports"
+LOG_FILE = DATA_DIR / "latest_session.log"
+
+# Create all directories
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Define label list
 label_list = ['Positivo', 'Negativo', 'No importante']
 actions = ['Agregar', 'Borrar']
 
 def init_session(session_state):
-
-    session_state['all_points'] = set()  # Set to track unique point
-    session_state['all_labels'] = {}  # Dictionary to track labels for each unique point
-    session_state['points'] = []
-    session_state['labels'] = []
-    session_state['csv_data'] = b""
-    session_state['report_data'] = b""
-    session_state['ann_image'] = b"" 
-
+    session_state.update({
+        'all_points': set(),
+        'all_labels': {},
+        'points': [],
+        'labels': [],
+        'csv_data': b"",  # Inicializar como bytes vacíos
+        'report_data': b"",
+        'ann_image': b""
+    })
 
 def update_patch_data(session_state, all_points, all_labels):
 
@@ -54,7 +61,8 @@ def update_results(session_state, all_points, all_labels, file_name):
 
     # Save CSV data to file
     csv_data = csv_buffer.getvalue()
-    csv_filename = f"{ann_dir}/{file_name}.csv"
+    csv_filename = f"{ANN_DIR}/{file_name}.csv"
+    Path(ANN_DIR).mkdir(parents=True, exist_ok=True)
     with open(csv_filename, "w", encoding="utf-8") as csv_file:
         csv_file.write(csv_data)
 
@@ -82,7 +90,8 @@ def update_results(session_state, all_points, all_labels, file_name):
     report_data = report_buffer.getvalue()
 
     # Save report to file
-    report_filename = f"{report_dir}/{file_name}.txt"
+    report_filename = f"{REPORT_DIR}/{file_name}.txt"
+    Path(REPORT_DIR).mkdir(parents=True, exist_ok=True)
     with open(report_filename, "w", encoding="utf-8") as report_file:
         report_file.write(report_content)
 
@@ -196,7 +205,7 @@ def recover_session(session_state, all_points, all_labels, image, file_name):
     update_ann_image(session_state, all_points, all_labels, image)
 
 
-def check_latest_session_log(log_path = "./estr_annotator/latest_session.log"):
+def check_latest_session_log(log_path=LOG_FILE):
     try:
         with open(log_path, 'r', encoding='utf-8') as file:
             contents = file.read()
@@ -209,7 +218,7 @@ def check_latest_session_log(log_path = "./estr_annotator/latest_session.log"):
         return "NoImage"
 
 
-def store_latest_session_log(file_name, log_path = "./estr_annotator/latest_session.log"):
+def store_latest_session_log(file_name, log_path=LOG_FILE):
     try:
         with open(log_path, 'w', encoding='utf-8') as file:
             file.write(file_name)
@@ -217,7 +226,7 @@ def store_latest_session_log(file_name, log_path = "./estr_annotator/latest_sess
         print(f"An error occurred: {e}")
 
 
-def check_files(image_file_name, folder_path="./images"):
+def check_files(image_file_name, folder_path):
     """
     Checks if a file (without its extension) exists in the specified folder.
 
@@ -291,19 +300,25 @@ def get_image():
     if uploaded_file is not None:
         image_file_name = uploaded_file.name
         image = Image.open(uploaded_file)
-        img_path = f"{image_dir}/{image_file_name}"
+        img_path = f"{IMAGE_DIR}/{image_file_name}"
 
     # No image was uploaded - We use the latest one from a previous session
     else: 
         # Check latest image
         latest_image = check_latest_session_log()
-        result = check_files(latest_image)
+        result = check_files(latest_image, IMAGE_DIR)
 
         if result:
             # Recover the latest image
             image_file_name = latest_image
-            image = Image.open(f"{image_dir}/{latest_image}")    
-            img_path = f"{image_dir}/{image_file_name}"
+            image_path = f"{IMAGE_DIR}/{latest_image}"
+            if os.path.exists(image_path):
+                image = Image.open(image_path)
+                img_path = image_path
+            else:
+                st.error(f"Error: File '{image_path}' not found.")
+        else:
+            st.error("No image found in the latest session log.")
 
     return image, image_file_name, img_path    
 
@@ -314,15 +329,16 @@ def handle_new_image(session_state, image, image_file_name, img_path):
     session_state['image_file_name'] = image_file_name
 
     # We check if the image was previously annotated
-    result = check_files(image_file_name)
+    result = check_files(image_file_name, IMAGE_DIR)
 
     if result: # Recover previous annotations
         base_name = os.path.splitext(image_file_name)[0]
-        csv_file_name = f"{ann_dir}/{base_name}.csv"
+        csv_file_name = f"{ANN_DIR}/{base_name}.csv"
         all_points, all_labels = read_results_from_csv(csv_file_name)
         recover_session(session_state, all_points, all_labels, image, base_name)
 
     else: # We store a backup of the image
+        Path(img_path).parent.mkdir(parents=True, exist_ok=True)
         image.save(img_path)
         init_session(session_state)
 
@@ -376,7 +392,7 @@ def image_ann(session_state):
         # User got disconnected - We recover the previous session
         except KeyError:
             base_name = os.path.splitext(image_file_name)[0]
-            csv_file_name = f"{ann_dir}/{base_name}.csv"
+            csv_file_name = f"{ANN_DIR}/{base_name}.csv"
             all_points, all_labels = read_results_from_csv(csv_file_name)
             recover_session(session_state, all_points, all_labels, image, base_name)
 

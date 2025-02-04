@@ -17,31 +17,19 @@ def main():
         st.session_state['Application'] = selected_app
 
     if selected_app == app_list[0]:
-        image_dir = "./ki67_annotator/images"
-        ann_dir = "./ki67_annotator/annotations"
-        report_dir = "./ki67_annotator/reports"
         if 'ki67' not in st.session_state:
             st.session_state['ki67'] = {}
         ki67_image_ann(st.session_state['ki67'])
     elif selected_app == app_list[1]:
-        image_dir = "./her2_annotator/images"
-        ann_dir = "./her2_annotator/annotations"
-        report_dir = "./her2_annotator/reports"
         if 'her2' not in st.session_state:
             st.session_state['her2'] = {}
         her2_image_ann(st.session_state['her2'])
     elif selected_app == app_list[2]:
-        # image_dir = "./estr_annotator/images"
-        # ann_dir = "./estr_annotator/annotations"
-        # report_dir = "./estr_annotator/reports"
         # if 'estrogeno' not in st.session_state:
         #     st.session_state['estrogeno'] = {}
         # estr_image_ann(st.session_state['estrogeno'])
         st.warning("Esta aplicación aún no está disponible.")
     elif selected_app == app_list[3]:
-        # image_dir = "./prog_annotator/images"
-        # ann_dir = "./prog_annotator/annotations"
-        # report_dir = "./prog_annotator/reports"
         # if 'progesterona' not in st.session_state:
         #     st.session_state['progesterona'] = {}
         # prog_image_ann(st.session_state['progesterona'])
