@@ -17,6 +17,12 @@ __pycache__/
 *.tiff
 *.svg
 
+# Ignores txt files
+*.txt
+
+# Ignore log files
+*.log
+
 <<<<<<< HEAD
 "node_modules/"
 =======
