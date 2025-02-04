@@ -17,13 +17,12 @@ def main():
         st.session_state['Application'] = selected_app
 
     if selected_app == app_list[0]:
-        # image_dir = "./ki67_annotator/images"
-        # ann_dir = "./ki67_annotator/annotations"
-        # report_dir = "./ki67_annotator/reports"
-        # if 'ki67' not in st.session_state:
-        #     st.session_state['ki67'] = {}
-        # ki67_image_ann(st.session_state['ki67'])
-        st.warning("Esta aplicación aún no está disponible.")
+        image_dir = "./ki67_annotator/images"
+        ann_dir = "./ki67_annotator/annotations"
+        report_dir = "./ki67_annotator/reports"
+        if 'ki67' not in st.session_state:
+            st.session_state['ki67'] = {}
+        ki67_image_ann(st.session_state['ki67'])
     elif selected_app == app_list[1]:
         image_dir = "./her2_annotator/images"
         ann_dir = "./her2_annotator/annotations"
