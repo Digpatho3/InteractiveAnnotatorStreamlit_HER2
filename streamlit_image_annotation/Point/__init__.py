@@ -17,15 +17,19 @@ if IS_RELEASE:
 else:
     _component_func = components.declare_component("st_point", url="http://localhost:3000")
 
-def get_colormap(label_names, colormap_name='gist_rainbow'):
-    colormap = {} 
-    cmap = plt.get_cmap(colormap_name)
-    for idx, l in enumerate(label_names):
-        rgb = [int(d) for d in np.array(cmap(float(idx)/len(label_names)))*255][:3]
-        colormap[l] = ('#%02x%02x%02x' % tuple(rgb))
-    return colormap
+def get_colormap(label_names, colormap_name='gist_rainbow', label_colors=None):
+    if label_colors is None:
+        colormap = {} 
+        cmap = plt.get_cmap(colormap_name)
+        for idx, l in enumerate(label_names):
+            rgb = [int(d) for d in np.array(cmap(float(idx)/len(label_names)))*255][:3]
+            colormap[l] = ('#%02x%02x%02x' % tuple(rgb))
+        return colormap
 
-def pointdet(image_path, label_list, points=None, labels=None, height=512, width=512, point_width=3, use_space=False, key=None, mode=None, label=None, zoom=2) -> CustomComponent:
+    else:
+        return {label: f'rgb({r},{g},{b})' for label, (r, g, b) in zip(label_names, label_colors)}
+
+def pointdet(image_path, label_list, points=None, labels=None, height=512, width=512, point_width=3, use_space=False, key=None, mode=None, label=None, zoom=2, label_colors=None) -> CustomComponent:
     image = Image.open(image_path)
     original_image_size = image.size
     image.thumbnail(size=(width, height))
@@ -36,7 +40,11 @@ def pointdet(image_path, label_list, points=None, labels=None, height=512, width
     if image_url.startswith('/'):
         image_url = image_url[1:]
 
-    color_map = get_colormap(label_list, colormap_name='gist_rainbow')
+    if label_colors is None:
+        color_map = get_colormap(label_list, colormap_name='gist_rainbow')
+    else:
+        color_map = get_colormap(label_list, label_colors=label_colors)
+        
     points_info = [{'point':[b/scale for b in item[0]], 'label_id': item[1], 'label': label_list[item[1]]} for item in zip(points, labels)]
     component_value = _component_func(image_url=image_url, image_size=image.size, label_list=label_list, points_info=points_info, color_map=color_map, point_width=point_width, use_space=use_space, key=key, mode=mode, label=label, zoom=zoom)
     if component_value is not None:

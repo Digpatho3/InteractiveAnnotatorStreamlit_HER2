@@ -25,6 +25,14 @@ REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Define label list
 label_list = ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente']
+label_colors = {
+    0: (255, 0, 0),       # Red
+    1: (255, 165, 0),     # Orange
+    2: (255, 255, 0),     # Yellow
+    3: (0, 128, 0),       # Green
+    4: (0, 0, 255),       # Blue
+    5: (128, 0, 128)      # Purple
+}
 actions = ['Agregar', 'Borrar']
 
 def init_session(session_state):
@@ -163,25 +171,9 @@ def update_ann_image(session_state, all_points, all_labels, image):
         image: PIL.Image object representing the base image.
     """
 
-    # Define colors for each label
-    label_colors = {
-        # Completa (RGB puro para máximo contraste)
-        0: (255, 59, 59),    # Rojo quirúrgico
-        1: (255, 178, 0),    # Ámbar
-        2: (255, 237, 0),    # Amarillo fluor
-        
-        # Incompleta (Tonos fríos no presentes en tinciones H&E)
-        3: (0, 100, 255),    # Azul real
-        4: (0, 206, 255),    # Cian
-        
-        # Ausente (Gris corregido gamma)
-        5: (128, 128, 128)   # Gris neutral (gamma 2.2)
-        
-        # Add more labels and their colors as needed
-    }
-
     # Create a drawable image
-    ann_image = image.copy()
+    ann_image = image.copy().convert("RGB")
+    ann_image.info.pop("icc_profile", None)
     draw = ImageDraw.Draw(ann_image)
 
     # Draw each point with the corresponding color
@@ -379,6 +371,15 @@ def image_ann(session_state):
 
         with col2:
             session_state['label'] = st.selectbox("Clase:", label_list)
+            
+        st.sidebar.subheader("Colores de las clases:")
+        col1, col2 = st.columns(2)
+        for idx, label in enumerate(label_list):
+            color = label_colors[idx]
+            if idx % 2 == 0:
+                col1.markdown(f"<span style='color:rgb{color}'>{label}</span>", unsafe_allow_html=True)
+            else:
+                col2.markdown(f"<span style='color:rgb{color}'>{label}</span>", unsafe_allow_html=True)
 
 
     image, image_file_name, img_path = get_image()
@@ -419,14 +420,15 @@ def image_ann(session_state):
             label_list=label_list,
             points=session_state['points'],
             labels=session_state['labels'],
-            width = image.size[0],
-            height = image.size[1],
+            width=image.size[0],
+            height=image.size[1],
             use_space=True,
             key=img_path,
-            mode = mode,
-            label = session_state['label'],
+            mode=mode,
+            label=session_state['label'],
             point_width=5,
             zoom=zoom,
+            label_colors=list(label_colors.values())
         )
         
         # Update points and labels in session state if any changes are made
