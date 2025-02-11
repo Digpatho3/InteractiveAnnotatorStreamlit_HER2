@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import os
 from pathlib import Path
+import glob
 
 # Folders
 MODULE_DIR = Path(__file__).parent.absolute()
@@ -397,6 +398,7 @@ def image_ann(session_state):
 
         # Check if a new image is uploaded
         if 'image_file_name' not in session_state or session_state['image_file_name'] != image_file_name:
+            delete_previous_files()
             handle_new_image(session_state, image, image_file_name, img_path)
 
         try:
@@ -481,3 +483,51 @@ def image_ann(session_state):
                 file_name=f'{image_name}_annotated.png',
                 mime='image/png'
             )
+            
+def delete_previous_files(except_file_name=None, keep_recent=2):
+    """
+    Deletes previous files in specified directories, keeping a specified number of recent files.
+    Args:
+        except_file_name (str, optional): The base name of a file to exclude from deletion. Defaults to None.
+        keep_recent (int, optional): The number of recent files to keep in each directory. Defaults to 2.
+    This function performs the following steps:
+    1. Identifies the most recent image files in the IMAGE_DIR directory.
+    2. Identifies the corresponding CSV annotation files in the ANN_DIR directory and report files in the REPORT_DIR directory.
+    3. Deletes older image files, annotation files, and report files, except for the specified number of recent files and any file with a base name matching `except_file_name`.
+    Note:
+        The directories IMAGE_DIR, ANN_DIR, and REPORT_DIR should be defined globally.
+    """
+    
+    def should_delete(file_path, except_file_name, recent_files):
+        if except_file_name is None:
+            return file_path not in recent_files
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        return base_name != except_file_name and file_path not in recent_files
+
+    def get_recent_files(directory, pattern, keep_recent):
+        files = glob.glob(f"{directory}/{pattern}")
+        files.sort(key=os.path.getmtime, reverse=True)
+        return files[:keep_recent]
+
+    # Get recent image files to keep
+    recent_image_files = get_recent_files(IMAGE_DIR, "*", keep_recent)
+    recent_image_basenames = [os.path.splitext(os.path.basename(f))[0] for f in recent_image_files]
+
+    # Get corresponding recent CSV and report files
+    recent_csv_files = [f"{ANN_DIR}/{basename}.csv" for basename in recent_image_basenames]
+    recent_report_files = [f"{REPORT_DIR}/{basename}.txt" for basename in recent_image_basenames]
+
+    # previous images
+    for file_path in glob.glob(f"{IMAGE_DIR}/*"):
+        if should_delete(file_path, except_file_name, recent_image_files):
+            os.remove(file_path)
+
+    # previous annotations
+    for file_path in glob.glob(f"{ANN_DIR}/*.csv"):
+        if should_delete(file_path, except_file_name, recent_csv_files):
+            os.remove(file_path)
+
+    # previous reports
+    for file_path in glob.glob(f"{REPORT_DIR}/*.txt"):
+        if should_delete(file_path, except_file_name, recent_report_files):
+            os.remove(file_path)
