@@ -187,7 +187,7 @@ def update_ann_image(session_state, all_points, all_labels, image):
     draw = ImageDraw.Draw(ann_image)
 
     # Draw each point with the corresponding color
-    point_radius = 7.5  # Radius of each point
+    point_radius = min(image.size) * 0.01  # 1% of the smaller dimension of the image
     for point in all_points:
         x, y = point
         label = all_labels.get(point, "default")  # Get the label for the point
@@ -197,7 +197,7 @@ def update_ann_image(session_state, all_points, all_labels, image):
         draw.ellipse(
             [(x - point_radius, y - point_radius), (x + point_radius, y + point_radius)],
             outline=color,
-            width=5,
+            width= int(point_radius * 3 / 5),
         )
 
     # Convert the annotated image to a downloadable JPEG format
