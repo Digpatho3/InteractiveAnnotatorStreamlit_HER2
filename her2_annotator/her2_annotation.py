@@ -375,12 +375,8 @@ def image_ann(session_state):
     # Sidebar content
     st.sidebar.header("Anotación de imágenes")
     with st.sidebar:
-        col1, col2 = st.columns([2, 2])
-        with col1:
-            session_state['action'] = st.selectbox("Acción:", actions)
-
-        with col2:
-            session_state['label'] = st.selectbox("Clase:", label_list)
+        session_state['action'] = st.selectbox("Acción:", actions)
+        session_state['label'] = st.selectbox("Clase:", label_list)
             
         st.sidebar.subheader("Colores de las clases:")
         col1, col2 = st.columns(2)
