@@ -78,21 +78,30 @@ def update_results(session_state, all_points, all_labels, file_name):
         csv_file.write(csv_data)
 
     # **Generate the Annotation Report**
-    num_positive = labels.count(0)
-    num_negative = labels.count(1)
+    class_counts = {label: 0 for label in label_list}
+    for label in labels:
+        class_counts[label_list[label]] += 1
 
-    total = num_positive + num_negative
+    total = sum(class_counts.values())
 
-    if total==0:
+    if total == 0:
         total = -1
 
     report_content = f"""
     Reporte de anotación
     ==================
     Nombre de la imagen: {file_name}
-    Número de puntos positivos: {num_positive} - Porcentaje: {100*num_positive/total}%
-    Número de puntos negativos: {num_negative} - Porcentaje: {100*num_negative/total}%
-    Cantidad total de elementos {total}
+    Fecha y hora: {pd.Timestamp.now(tz='America/Sao_Paulo').strftime('%Y-%m-%d %H:%M:%S')}
+    
+    Cantidad total de elementos: {total}
+    
+    Número de elementos por clase:
+        {label_list[0]}: | {class_counts[label_list[0]]} | {100 * class_counts[label_list[0]] / total:.1f}% |
+        {label_list[1]}: | {class_counts[label_list[1]]} | {100 * class_counts[label_list[1]] / total:.1f}% |
+        {label_list[2]}: | {class_counts[label_list[2]]} | {100 * class_counts[label_list[2]] / total:.1f}% |
+        {label_list[3]}: | {class_counts[label_list[3]]} | {100 * class_counts[label_list[3]] / total:.1f}% |
+        {label_list[4]}: | {class_counts[label_list[4]]} | {100 * class_counts[label_list[4]] / total:.1f}% |
+        {label_list[5]}: | {class_counts[label_list[5]]} | {100 * class_counts[label_list[5]] / total:.1f}% |
     """
 
     # Create file-like object to download the report
