@@ -4,11 +4,13 @@ import io
 import csv
 from PIL import Image
 from PIL import Image, ImageDraw
+import cv2
 import numpy as np
 import pandas as pd
 import os
 from pathlib import Path
 import glob
+import shutil
 
 # Folders
 MODULE_DIR = Path(__file__).parent.absolute()
@@ -354,6 +356,7 @@ def handle_new_image(session_state, image, image_file_name, img_path):
     else: # We store a backup of the image
         Path(img_path).parent.mkdir(parents=True, exist_ok=True)
         image.save(img_path)
+        create_backup(image_file_name)
         init_session(session_state)
 
     # We log the name of the image for session backups
@@ -370,7 +373,9 @@ def image_ann(session_state):
             max_value=4, 
             value=1, 
             step=1
-        )            
+        )
+        apply_white_balance_toggle = st.checkbox("Aplicar balance de blancos")
+        apply_histogram_equalization_toggle = st.checkbox("Aplicar ecualización")
 
     # Sidebar content
     st.sidebar.header("Anotación de imágenes")
@@ -400,6 +405,20 @@ def image_ann(session_state):
         if 'image_file_name' not in session_state or session_state['image_file_name'] != image_file_name:
             delete_previous_files()
             handle_new_image(session_state, image, image_file_name, img_path)
+            
+        if apply_white_balance_toggle:
+            apply_white_balance_and_save(image_file_name)
+        else:
+            # Restore from backup if white balance is not applied
+            backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
+            shutil.copy(backup_path, f"{IMAGE_DIR}/{image_file_name}")
+
+        if apply_histogram_equalization_toggle:
+            apply_histogram_equalization_and_save(image_file_name)
+        else:
+            # Restore from backup if histogram equalization is not applied
+            backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
+            shutil.copy(backup_path, f"{IMAGE_DIR}/{image_file_name}")
 
         try:
             all_points = session_state['all_points']
@@ -493,7 +512,7 @@ def delete_previous_files(except_file_name=None, keep_recent=2):
     This function performs the following steps:
     1. Identifies the most recent image files in the IMAGE_DIR directory.
     2. Identifies the corresponding CSV annotation files in the ANN_DIR directory and report files in the REPORT_DIR directory.
-    3. Deletes older image files, annotation files, and report files, except for the specified number of recent files and any file with a base name matching `except_file_name`.
+    3. Deletes older image files, annotation files, report files, and backup files, except for the specified number of recent files and any file with a base name matching `except_file_name`.
     Note:
         The directories IMAGE_DIR, ANN_DIR, and REPORT_DIR should be defined globally.
     """
@@ -516,6 +535,7 @@ def delete_previous_files(except_file_name=None, keep_recent=2):
     # Get corresponding recent CSV and report files
     recent_csv_files = [f"{ANN_DIR}/{basename}.csv" for basename in recent_image_basenames]
     recent_report_files = [f"{REPORT_DIR}/{basename}.txt" for basename in recent_image_basenames]
+    recent_backup_files = [f"{IMAGE_DIR}/_BACK_{basename}" for basename in recent_image_basenames]
 
     # previous images
     for file_path in glob.glob(f"{IMAGE_DIR}/*"):
@@ -531,3 +551,60 @@ def delete_previous_files(except_file_name=None, keep_recent=2):
     for file_path in glob.glob(f"{REPORT_DIR}/*.txt"):
         if should_delete(file_path, except_file_name, recent_report_files):
             os.remove(file_path)
+
+    # previous backups
+    for file_path in glob.glob(f"_BACK_{IMAGE_DIR}/*"):
+        if should_delete(file_path, except_file_name, recent_backup_files):
+            os.remove(file_path)
+            
+def apply_white_balance(image, alpha=1.0):
+    image = np.array(image)
+    R, G, B = cv2.split(image)
+
+    R_factor = 255 / (np.max(R) * alpha)
+    G_factor = 255 / (np.max(G) * alpha)
+    B_factor = 255 / (np.max(B) * alpha)
+
+    img_modificada = cv2.merge((R * R_factor, G * G_factor, B * B_factor))
+
+    np.clip(img_modificada, 0, 255, out = img_modificada)
+  
+    img_modificada = img_modificada.astype('uint8')
+
+    return img_modificada
+
+def apply_histogram_equalization(image):
+    image = np.array(image)
+    
+    imgLab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
+
+    L, A, B = cv2.split(imgLab)
+
+    clahe = cv2.createCLAHE(clipLimit = 1.5, tileGridSize=(8,8))
+
+    L_eq = clahe.apply(L)
+
+    imgLabEq = cv2.merge([L_eq, A, B])
+
+    imgRGBeq = cv2.cvtColor(imgLabEq, cv2.COLOR_LAB2RGB)
+
+    return imgRGBeq
+
+def create_backup(image_file_name):
+    image_path = f"{IMAGE_DIR}/{image_file_name}"
+    backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
+    shutil.copy(image_path, backup_path)
+
+def apply_white_balance_and_save(image_file_name):
+    backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
+    image = Image.open(backup_path)
+    balanced_image = apply_white_balance(image)
+    balanced_image = Image.fromarray(balanced_image)
+    balanced_image.save(f"{IMAGE_DIR}/{image_file_name}")
+
+def apply_histogram_equalization_and_save(image_file_name):
+    backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
+    image = Image.open(backup_path)
+    equalized_image = apply_histogram_equalization(image)
+    equalized_image = Image.fromarray(equalized_image)
+    equalized_image.save(f"{IMAGE_DIR}/{image_file_name}")
