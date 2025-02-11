@@ -374,8 +374,19 @@ def image_ann(session_state):
             value=1, 
             step=1
         )
-        apply_white_balance_toggle = st.checkbox("Aplicar balance de blancos")
-        apply_histogram_equalization_toggle = st.checkbox("Aplicar ecualización")
+        apply_white_balance_toggle = st.checkbox("Balancear blancos")
+        apply_histogram_equalization_toggle = st.checkbox("Ecualizar")
+        apply_brown_toggle = st.checkbox("Aislar tinción marrón")
+        apply_blue_toggle = st.checkbox("Aislar tinción azul")
+        
+        # Add sliders for blue and brown thresholds
+        col1, col2 = st.columns(2)
+        with col1:
+            blue_lower_thresh = st.slider("Lím inf azúl", min_value=100, max_value=120, value=110, step=1)
+            brown_lower_thresh = st.slider("Lím inf marrón", min_value=0, max_value=15, value=5, step=1)
+        with col2:
+            blue_upper_thresh = st.slider("Lím sup azúl", min_value=120, max_value=140, value=130, step=1)
+            brown_upper_thresh = st.slider("Lím sup marrón", min_value=15, max_value=30, value=20, step=1)
 
     # Sidebar content
     st.sidebar.header("Anotación de imágenes")
@@ -408,15 +419,18 @@ def image_ann(session_state):
             
         if apply_white_balance_toggle:
             apply_white_balance_and_save(image_file_name)
-        else:
-            # Restore from backup if white balance is not applied
-            backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
-            shutil.copy(backup_path, f"{IMAGE_DIR}/{image_file_name}")
 
         if apply_histogram_equalization_toggle:
             apply_histogram_equalization_and_save(image_file_name)
-        else:
-            # Restore from backup if histogram equalization is not applied
+            
+        if apply_brown_toggle:
+            apply_brown_stain_and_save(image_file_name, brown_lower_thresh, brown_upper_thresh)
+
+        if apply_blue_toggle:
+            apply_blue_stain_and_save(image_file_name, blue_lower_thresh, blue_upper_thresh)
+
+        # Restore from backup if no processing is applied
+        if not (apply_white_balance_toggle or apply_histogram_equalization_toggle or apply_brown_toggle or apply_blue_toggle):
             backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
             shutil.copy(backup_path, f"{IMAGE_DIR}/{image_file_name}")
 
@@ -590,6 +604,20 @@ def apply_histogram_equalization(image):
 
     return imgRGBeq
 
+def apply_brown_stain(image, lower_thresh=(10, 100, 20), upper_thresh=(20, 255, 200)):
+    image = np.array(image)
+    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    mask = cv2.inRange(hsv, lower_thresh, upper_thresh)
+    result = cv2.bitwise_and(image, image, mask=mask)
+    return result
+
+def apply_blue_stain(image, lower_thresh=(110, 50, 50), upper_thresh=(130, 255, 255)):
+    image = np.array(image)
+    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    mask = cv2.inRange(hsv, lower_thresh, upper_thresh)
+    result = cv2.bitwise_and(image, image, mask=mask)
+    return result
+
 def create_backup(image_file_name):
     image_path = f"{IMAGE_DIR}/{image_file_name}"
     backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
@@ -608,3 +636,17 @@ def apply_histogram_equalization_and_save(image_file_name):
     equalized_image = apply_histogram_equalization(image)
     equalized_image = Image.fromarray(equalized_image)
     equalized_image.save(f"{IMAGE_DIR}/{image_file_name}")
+    
+def apply_brown_stain_and_save(image_file_name, lower_thresh, upper_thresh):
+    backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
+    image = Image.open(backup_path)
+    brown_image = apply_brown_stain(image, (lower_thresh, 100, 20), (upper_thresh, 255, 200))
+    brown_image = Image.fromarray(brown_image)
+    brown_image.save(f"{IMAGE_DIR}/{image_file_name}")
+
+def apply_blue_stain_and_save(image_file_name, lower_thresh, upper_thresh):
+    backup_path = f"{IMAGE_DIR}/_BACK_{image_file_name}"
+    image = Image.open(backup_path)
+    blue_image = apply_blue_stain(image, (lower_thresh, 50, 50), (upper_thresh, 255, 255))
+    blue_image = Image.fromarray(blue_image)
+    blue_image.save(f"{IMAGE_DIR}/{image_file_name}")
