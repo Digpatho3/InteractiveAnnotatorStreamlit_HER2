@@ -8,7 +8,7 @@ from her2_annotator.her2_annotation import image_ann as her2_image_ann
 from estr_annotator.estr_annotation import image_ann as estr_image_ann
 from prog_annotator.prog_annotation import image_ann as prog_image_ann
 
-app_list = ["Anotador KI67", "Anotador HER2", "Anotador Estrógeno", "Anotador Progesterona"]
+app_list = ["Anotador HER2", "Anotador KI67", "Anotador Estrógeno", "Anotador Progesterona"]
 
 # We want the wide mode to be set by default
 st.set_page_config(page_title=None, page_icon=None, layout="wide", initial_sidebar_state="auto", menu_items=None)
@@ -20,13 +20,13 @@ def main():
         st.session_state['Application'] = selected_app
 
     if selected_app == app_list[0]:
-        if 'ki67' not in st.session_state:
-            st.session_state['ki67'] = {}
-        ki67_image_ann(st.session_state['ki67'])
-    elif selected_app == app_list[1]:
         if 'her2' not in st.session_state:
             st.session_state['her2'] = {}
         her2_image_ann(st.session_state['her2'])
+    elif selected_app == app_list[1]:
+        if 'ki67' not in st.session_state:
+            st.session_state['ki67'] = {}
+        ki67_image_ann(st.session_state['ki67'])
     elif selected_app == app_list[2]:
         # if 'estrogeno' not in st.session_state:
         #     st.session_state['estrogeno'] = {}
