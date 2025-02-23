@@ -20,12 +20,13 @@ export interface PythonArgs {
   color_map: any,
   point_width: number,
   use_space: boolean,
-  mode: string,   // <-- Added "mode" to the Python arguments
-  label: string,  // <-- Added "label" to the Python arguments
+  mode: string,
+  label: string,
   zoom: number,
   mask_trans: number,
   contour_trans: number
 }
+
 const PointDet = ({ args, theme }: ComponentProps) => {
   const {
     image_url,
@@ -36,9 +37,8 @@ const PointDet = ({ args, theme }: ComponentProps) => {
     points_info,
     color_map,
     point_width,
-    use_space,
-    mode,  // <-- Extract "mode" from the args
-    label,  // <-- Extract "label" from the args
+    mode,
+    label,
     zoom,
     mask_trans,
     contour_trans,
@@ -50,15 +50,13 @@ const PointDet = ({ args, theme }: ComponentProps) => {
   const [mask] = useImage(baseUrl + mask_url)
   const [contour] = useImage(baseUrl + contour_url)
   const [pointsInfo, setPointsInfo] = React.useState(
-    points_info.map((p, i) => {
-      return {
-        x: p.point[0],
-        y: p.point[1],
-        label: p.label,
-        stroke: color_map[p.label],
-        id: 'point-' + i
-      }
-    })
+    points_info.map((p, i) => ({
+      x: p.point[0],
+      y: p.point[1],
+      label: p.label,
+      stroke: color_map[p.label],
+      id: 'point-' + i
+    }))
   );
 
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
@@ -76,35 +74,66 @@ const PointDet = ({ args, theme }: ComponentProps) => {
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      if (use_space && event.key === ' ') { 
-        const currentPointsValue = pointsInfo.map((point, i) => {
-          return {
+      if (!selectedId) return;
+      
+      // Find the selected point
+      const selectedPoint = pointsInfo.find(p => p.id === selectedId);
+      if (!selectedPoint) return;
+  
+      const currentIndex = label_list.indexOf(selectedPoint.label);
+      let newLabel = selectedPoint.label;
+  
+      // Delete Point (Backslash or Backspace)
+      if (event.key === "\\" || event.code === "Backslash" || event.code === "IntlBackslash" || event.key === "Backspace") {
+        setPointsInfo(prevPoints => {
+          const updatedPoints = prevPoints.filter(p => p.id !== selectedId);
+          Streamlit.setComponentValue(updatedPoints.map(point => ({
             point: [point.x, point.y],
             label_id: label_list.indexOf(point.label),
             label: point.label
-          }
-        })
-        Streamlit.setComponentValue(currentPointsValue)
+          })));
+          return updatedPoints;
+        });
+        setSelectedId(null);
+        return;
+      }
+  
+      if (event.key === "Shift") {
+        newLabel = label_list[(currentIndex + 1) % label_list.length];  // Next label
+      }
+  
+      if (newLabel !== selectedPoint.label) {
+        setPointsInfo(prevPoints => {
+          const updatedPoints = prevPoints.map(p =>
+            p.id === selectedId ? { ...p, label: newLabel, stroke: color_map[newLabel] } : p
+          );
+  
+          // **Immediately update Streamlit with new labels**
+          Streamlit.setComponentValue(updatedPoints.map(point => ({
+            point: [point.x, point.y],
+            label_id: label_list.indexOf(point.label),
+            label: point.label
+          })));
+  
+          return updatedPoints;
+        });
       }
     };
-    window.addEventListener('keydown', handleKeyPress);
+  
+    window.addEventListener("keydown", handleKeyPress);
     return () => {
-      window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener("keydown", handleKeyPress);
     };
-  }, [pointsInfo]); 
-
-  // This effect runs only when pointsInfo changes
+  }, [selectedId, pointsInfo]);
+  // Update backend when pointsInfo changes
   useEffect(() => {
-    // Only set the component value when pointsInfo changes
-    const currentPointsValue = pointsInfo.map((point, i) => {
-      return {
-        point: [point.x, point.y],
-        label_id: label_list.indexOf(point.label),
-        label: point.label
-      }
-    })
+    const currentPointsValue = pointsInfo.map(point => ({
+      point: [point.x, point.y],
+      label_id: label_list.indexOf(point.label),
+      label: point.label
+    }))
     Streamlit.setComponentValue(currentPointsValue)
-  }, [pointsInfo]); // Triggered when pointsInfo changes
+  }, [pointsInfo]);
 
   return (
     <ChakraProvider>
@@ -114,10 +143,10 @@ const PointDet = ({ args, theme }: ComponentProps) => {
             <Box 
               width="100%" 
               style={{
-                overflow: 'auto',  // Scrollbars enabled if content overflows
-                maxWidth: '100%',  // Restrict width to avoid unnecessary scroll
-                maxHeight: '100vh', // Set the max height relative to the viewport
-                position: 'relative' // Needed for proper overflow control
+                overflow: 'auto',  
+                maxWidth: '100%',  
+                maxHeight: '100vh', 
+                position: 'relative' 
               }}
             >
               <PointCanvas
