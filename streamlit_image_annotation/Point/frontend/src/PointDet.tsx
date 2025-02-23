@@ -3,8 +3,8 @@ import {
   withStreamlitConnection,
   ComponentProps
 } from "streamlit-component-lib"
-import React, { useEffect, useState } from "react"
-import { ChakraProvider, Box, Spacer, HStack, Center } from '@chakra-ui/react'
+import React, { useEffect, useState, useRef } from "react"
+import { ChakraProvider, Box, HStack, Center } from '@chakra-ui/react'
 
 import useImage from 'use-image';
 import ThemeSwitcher from './ThemeSwitcher'
@@ -49,7 +49,7 @@ const PointDet = ({ args, theme }: ComponentProps) => {
   const [image] = useImage(baseUrl + image_url)
   const [mask] = useImage(baseUrl + mask_url)
   const [contour] = useImage(baseUrl + contour_url)
-  const [pointsInfo, setPointsInfo] = React.useState(
+  const [pointsInfo, setPointsInfo] = useState(
     points_info.map((p, i) => ({
       x: p.point[0],
       y: p.point[1],
@@ -59,80 +59,70 @@ const PointDet = ({ args, theme }: ComponentProps) => {
     }))
   );
 
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [scale, setScale] = useState(1.0);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [scale, setScale] = useState(1.0)
   useEffect(() => {
     const resizeCanvas = () => {
-      const scale_ratio = window.innerWidth / image_size[0]
-      setScale(Math.min(scale_ratio, 1.0))
-      Streamlit.setFrameHeight(image_size[1] * Math.min(scale_ratio, 1.0))
-    }
+      const scale_ratio = window.innerWidth / image_size[0];
+      setScale(Math.min(scale_ratio, 1.0));
+      Streamlit.setFrameHeight(image_size[1] * Math.min(scale_ratio, 1.0));
+    };
     window.addEventListener('resize', resizeCanvas);
-    resizeCanvas()
-  }, [image_size])
+    resizeCanvas();
+    return () => window.removeEventListener('resize', resizeCanvas);
+  }, [image_size]);
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       if (!selectedId) return;
-      
-      // Find the selected point
+
       const selectedPoint = pointsInfo.find(p => p.id === selectedId);
       if (!selectedPoint) return;
-  
+
       const currentIndex = label_list.indexOf(selectedPoint.label);
       let newLabel = selectedPoint.label;
-  
+
       // Delete Point (Backslash or Backspace)
       if (event.key === "\\" || event.code === "Backslash" || event.code === "IntlBackslash" || event.key === "Backspace") {
-        setPointsInfo(prevPoints => {
-          const updatedPoints = prevPoints.filter(p => p.id !== selectedId);
-          Streamlit.setComponentValue(updatedPoints.map(point => ({
-            point: [point.x, point.y],
-            label_id: label_list.indexOf(point.label),
-            label: point.label
-          })));
-          return updatedPoints;
-        });
+        setPointsInfo(prevPoints => prevPoints.filter(p => p.id !== selectedId));
         setSelectedId(null);
         return;
       }
-  
+
       if (event.key === "Shift") {
-        newLabel = label_list[(currentIndex + 1) % label_list.length];  // Next label
+        newLabel = label_list[(currentIndex + 1) % label_list.length]; // Next label
       }
-  
+
       if (newLabel !== selectedPoint.label) {
-        setPointsInfo(prevPoints => {
-          const updatedPoints = prevPoints.map(p =>
+        setPointsInfo(prevPoints =>
+          prevPoints.map(p =>
             p.id === selectedId ? { ...p, label: newLabel, stroke: color_map[newLabel] } : p
-          );
-  
-          // **Immediately update Streamlit with new labels**
-          Streamlit.setComponentValue(updatedPoints.map(point => ({
-            point: [point.x, point.y],
-            label_id: label_list.indexOf(point.label),
-            label: point.label
-          })));
-  
-          return updatedPoints;
-        });
+          )
+        );
       }
     };
-  
+
     window.addEventListener("keydown", handleKeyPress);
     return () => {
       window.removeEventListener("keydown", handleKeyPress);
     };
   }, [selectedId, pointsInfo]);
-  // Update backend when pointsInfo changes
+
   useEffect(() => {
-    const currentPointsValue = pointsInfo.map(point => ({
-      point: [point.x, point.y],
-      label_id: label_list.indexOf(point.label),
-      label: point.label
-    }))
-    Streamlit.setComponentValue(currentPointsValue)
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    updateTimeoutRef.current = setTimeout(() => {
+      const currentPointsValue = pointsInfo.map(point => ({
+        point: [point.x, point.y],
+        label_id: label_list.indexOf(point.label),
+        label: point.label
+      }));
+      Streamlit.setComponentValue(currentPointsValue);
+    }, 1000); // Delay of 1 second
   }, [pointsInfo]);
 
   return (
@@ -176,4 +166,4 @@ const PointDet = ({ args, theme }: ComponentProps) => {
   )
 }
 
-export default withStreamlitConnection(PointDet)
+export default withStreamlitConnection(PointDet);
