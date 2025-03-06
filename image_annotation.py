@@ -355,6 +355,7 @@ def image_ann(session_state):
         - **Selección de puntos:** Haz clic y arrastra para dibujar un cuadro y seleccionar puntos.
         - **Eliminar puntos:** Presionar 'retroceso' permite eliminar los puntos seleccionados.
         - **Cambiar etiqueta:** Presionar 'shift' cambia la clase del punto seleccionado.  
+        - **Mover imagen horizontalmente:** Usa las flechas del teclado para moverte a través de la imagen.
         """,
         unsafe_allow_html=True
     )
