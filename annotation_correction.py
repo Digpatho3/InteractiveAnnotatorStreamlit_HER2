@@ -189,7 +189,8 @@ def ann_correction(session_state):
             session_state['action'] = st.selectbox("Acción:", actions)
 
         with col2:
-            session_state['label'] = st.selectbox("Clase:", label_list)
+            category = st.selectbox("Categoría:", categories)
+            session_state['label'] = st.selectbox("Clase:", label_lists[category])
 
     # Add a button to the sidebar
     st.sidebar.header("Finalizar")
