@@ -15,7 +15,14 @@ report_dir = "./reports"
 anns_todo_dir = 'anotaciones_a_corregir'
 anns_done_dir = 'anotaciones_corregidas'
 
-label_list = ['Positivo', 'Negativo', 'No importante']
+categories = ['Ki67', 'Estrógeno', 'Progesterona', 'HER2/neu']
+label_lists = {
+    'Ki67': ['Positivo', 'Negativo', 'No importante'],
+    'Estrógeno': ['Positivo', 'Negativo', 'No importante'],
+    'Progesterona': ['Positivo', 'Negativo', 'No importante'],
+    'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente']
+}
+label_list = label_lists['HER2/neu']
 
 path_to_json_key = "pydrive_credentials.json"
 

@@ -14,7 +14,15 @@ ann_dir    = "./annotations"
 report_dir = "./reports"
 
 # Define label list
-label_list = ['Positivo', 'Negativo', 'No importante']
+categories = ['Ki67', 'Estrógeno', 'Progesterona', 'HER2/neu']
+label_lists = {
+    'Ki67': ['Positivo', 'Negativo', 'No importante'],
+    'Estrógeno': ['Positivo', 'Negativo', 'No importante'],
+    'Progesterona': ['Positivo', 'Negativo', 'No importante'],
+    'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente']
+}
+label_list = label_lists['HER2/neu']
+
 actions = ['Agregar', 'Borrar']
 
 def init_session(session_state):
@@ -383,8 +391,8 @@ def image_ann(session_state):
             session_state['action'] = st.selectbox("Acción:", actions)
 
         with col2:
-            session_state['label'] = st.selectbox("Clase:", label_list)
-
+            category = st.selectbox("Categoría:", categories)
+            session_state['label'] = st.selectbox("Clase:", label_lists[category])
 
     image_file_name, img_path = get_image(session_state)
 
@@ -418,7 +426,7 @@ def image_ann(session_state):
         # Use pointdet to annotate the image
         new_labels = pointdet(
             image=session_state['resized_image'],
-            label_list=label_list,
+            label_list=label_lists[category],
             points=session_state['points'],
             labels=session_state['labels'],
             width = 1280,
