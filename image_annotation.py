@@ -20,6 +20,7 @@ label_lists = {
     'Estrógeno': ['Positivo', 'Negativo', 'No importante'],
     'Progesterona': ['Positivo', 'Negativo', 'No importante'],
     'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente']
+    # 'HER2/neu': ['C3', 'C2', 'C1', 'I2', 'I1', 'AUS']
 }
 label_list = label_lists['HER2/neu']
 

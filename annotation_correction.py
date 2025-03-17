@@ -14,13 +14,15 @@ ann_dir    = "./annotations"
 report_dir = "./reports"
 anns_todo_dir = 'anotaciones_a_corregir'
 anns_done_dir = 'anotaciones_corregidas'
+parent_folder_id = '1Y423-t-9GesYP1RwRRmnBnQl8bRYEpAC' # Shared folder
 
-categories = ['Ki67', 'Estrógeno', 'Progesterona', 'HER2/neu']
+biomarkers = ['Ki67', 'Estrógeno', 'Progesterona', 'HER2/neu']
 label_lists = {
     'Ki67': ['Positivo', 'Negativo', 'No importante'],
-    'Estrógeno': ['Positivo', 'Negativo', 'No importante'],
-    'Progesterona': ['Positivo', 'Negativo', 'No importante'],
+    'Estrógeno': ['Positivo 3+', 'Positivo 2+', 'Positivo 1+', 'Negativo', 'No importante'],
+    'Progesterona': ['Positivo 3+', 'Positivo 2+', 'Positivo 1+', 'Negativo', 'No importante'],
     'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente']
+    # 'HER2/neu': ['C3', 'C2', 'C1', 'I2', 'I1', 'AUS']
 }
 label_list = label_lists['HER2/neu']
 
@@ -30,8 +32,11 @@ def setup_drive(session_state):
     drive = get_drive(path_to_json_key)
 
     folder_dict, todo_dict, done_dict = \
-        get_dicts(drive, anns_todo_dir, anns_done_dir)
+        get_dicts(drive, anns_todo_dir, anns_done_dir, parent_folder_id)
 
+    print("todo_dict:", todo_dict)
+    print("done_dict:", done_dict)
+    
     session_state['drive']=drive
     session_state['todo_dict'] = todo_dict
     session_state['done_dict'] = done_dict
@@ -58,12 +63,13 @@ def setup_drive(session_state):
 
 def load_sample(session_state, selected_sample):
 
-    # Check if selected sample is alreaded downloaded
+    # Check if selected sample is already downloaded
     img_path = None
+    ann_file_path = None
     for file in os.listdir(image_dir):
         if os.path.splitext(file)[0].strip() == selected_sample.strip():
             img_path = f"{image_dir}/{file}" 
-            ann_file_path  = f"{ann_dir}/{selected_sample}.csv"
+            ann_file_path = f"{ann_dir}/{selected_sample}.csv"
             break
 
     # Download sample
@@ -84,7 +90,6 @@ def load_sample(session_state, selected_sample):
             ann_file_path = get_gdrive_csv_path(drive, 
                 done_dict[selected_sample], ann_dir, selected_sample)
 
-
     image_file_name = selected_sample 
     image = Image.open(img_path)
     height = image.size[1]
@@ -93,6 +98,11 @@ def load_sample(session_state, selected_sample):
     session_state['resized_image'] = image.resize((1280, int(scale*height)))
     session_state['height'] = int(scale*height)
     session_state['scale'] = scale
+
+    # Check if annotation file exists, if not create it
+    if not os.path.exists(ann_file_path):
+        with open(ann_file_path, 'w', encoding='utf-8') as ann_csv:
+            ann_csv.write("X,Y,Label\n")
 
     with open(ann_file_path, 'r', encoding='utf-8') as ann_csv:
         annotations = ann_csv.read()

@@ -38,7 +38,7 @@ def get_drive(path_to_json):
     # Return drive.
     return drive
 
-def get_dicts(drive, todo_name, done_name):
+def get_dicts(drive, todo_name, done_name, parent_folder_id=None):
     """Get dictionaries for to-do files, done files and their folders.
     
     Parameters
@@ -49,6 +49,8 @@ def get_dicts(drive, todo_name, done_name):
         Name of the folder containing to-do files.
     done_name : str
         Name of the folder containing done files.
+    parent_folder_id : str, optional
+        ID of the parent folder where `todo_name` and `done_name` are located.
 
     Returns
     -------
@@ -68,14 +70,29 @@ def get_dicts(drive, todo_name, done_name):
         different type of files share the same file name, they'll be 
         grouped into the same list.
     """
+    # Query to find folders
+    query = f"trashed=false and mimeType='application/vnd.google-apps.folder'"
+    if parent_folder_id:
+        query += f" and '{parent_folder_id}' in parents"
+
     # Folder Dictionary. Keys are these two folder names, and their values 
     # are their associated GoogleDriveFile objects.
     folder_dict = {
         fname: gfile 
-        for gfile in drive.ListFile({"q": 'trashed=false'}).GetList() 
+        for gfile in drive.ListFile({"q": query}).GetList() 
         for fname in [todo_name, done_name] 
         if gfile['title'] == fname
     }
+
+    # Clear console
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+    # Print all files in the drive
+    file_list = drive.ListFile({"q": 'trashed=false'}).GetList()
+    for file in file_list:
+        print('title: %s, id: %s' % (file['title'], file['id']))
+
+    print("Folder Dictionary:", folder_dict)
 
     # Similar dictionaries for every done and to-do files.
     # Here, keys are their filenames [no file extenson], and values are lists 
