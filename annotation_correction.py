@@ -5,15 +5,20 @@ from PIL import Image, ImageDraw
 from image_annotation import *
 from pydrive_utils import *
 
-checked_symbol = '(✅)'
-unchecked_symbol = ''
+todo_symbol = '(⬜️)'
+toreview_symbol = '(👀)'
+done_symbol = '(✅)'
+discard_symbol = '(❌)'
 
 # Folders
 image_dir  = "./images"
 ann_dir    = "./annotations"
 report_dir = "./reports"
-anns_todo_dir = 'anotaciones_a_corregir'
-anns_done_dir = 'anotaciones_corregidas'
+
+anns_todo_dir = 'anotaciones_a_hacer'
+anns_toreview_dir = 'anotaciones_a_revisar'
+anns_done_dir = 'anotaciones_ok'
+
 parent_folder_id = '1Y423-t-9GesYP1RwRRmnBnQl8bRYEpAC' # Shared folder
 
 biomarkers = ['Ki67', 'Estrógeno', 'Progesterona', 'HER2/neu']
@@ -21,8 +26,8 @@ label_lists = {
     'Ki67': ['Positivo', 'Negativo', 'No importante'],
     'Estrógeno': ['Positivo 3+', 'Positivo 2+', 'Positivo 1+', 'Negativo', 'No importante'],
     'Progesterona': ['Positivo 3+', 'Positivo 2+', 'Positivo 1+', 'Negativo', 'No importante'],
-    'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente']
-    # 'HER2/neu': ['C3', 'C2', 'C1', 'I2', 'I1', 'AUS']
+    # 'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente']
+    'HER2/neu': ['C3', 'C2', 'C1', 'I2', 'I1', 'AUS']
 }
 label_list = label_lists['HER2/neu']
 
@@ -31,34 +36,26 @@ path_to_json_key = "pydrive_credentials.json"
 def setup_drive(session_state):
     drive = get_drive(path_to_json_key)
 
-    folder_dict, todo_dict, done_dict = \
-        get_dicts(drive, anns_todo_dir, anns_done_dir, parent_folder_id)
+    folder_dict, todo_dict, toreview_dict, done_dict = \
+        get_dicts(drive, anns_todo_dir, anns_toreview_dir, anns_done_dir, parent_folder_id)
 
-    print("todo_dict:", todo_dict)
-    print("done_dict:", done_dict)
-    
-    session_state['drive']=drive
+    session_state['drive'] = drive
     session_state['todo_dict'] = todo_dict
+    session_state['toreview_dict'] = toreview_dict
     session_state['done_dict'] = done_dict
     session_state['folder_dict'] = folder_dict
 
-    todo_sample_names = list(todo_dict.keys()) 
-    done_sample_names = list(done_dict.keys())
-
+    # Combine all sample names with their corresponding symbols
     sample_list = {}
-    for sample_name in todo_sample_names:
-        sample_list[sample_name] = False
-    for sample_name in done_sample_names:
-        sample_list[sample_name] = True
+    for sample_name in todo_dict.keys():
+        sample_list[f"{sample_name} {todo_symbol}"] = sample_name
+    for sample_name in toreview_dict.keys():
+        sample_list[f"{sample_name} {toreview_symbol}"] = sample_name
+    for sample_name in done_dict.keys():
+        sample_list[f"{sample_name} {done_symbol}"] = sample_name
 
-    # Create display names reflecting annotation status
-    display_samples = [f"{name} {checked_symbol if annotated else unchecked_symbol}"
-                        for name, annotated in sample_list.items()]
-
-    sample_names = list(sample_list.keys()) 
-
-    session_state['display_samples'] = display_samples
-    session_state['sample_names'] = sample_names
+    session_state['display_samples'] = list(sample_list.keys())
+    session_state['sample_names'] = list(sample_list.values())
 
 
 def load_sample(session_state, selected_sample):
@@ -76,17 +73,29 @@ def load_sample(session_state, selected_sample):
     if img_path is None:
         drive = session_state['drive']
         todo_dict = session_state['todo_dict']
+        toreview_dict = session_state['toreview_dict']
         done_dict = session_state['done_dict']
 
         if selected_sample in todo_dict.keys():
+            # Download the image from Google Drive
             img_path = get_gdrive_image_path(drive, 
                 todo_dict[selected_sample], image_dir, selected_sample)
-            ann_file_path = get_gdrive_csv_path(drive, 
-                todo_dict[selected_sample], ann_dir, selected_sample)
+            # Create an empty CSV file locally (do not attempt to download it)
+            ann_file_path = f"{ann_dir}/{selected_sample}.csv"
+            with open(ann_file_path, 'w', encoding='utf-8') as ann_csv:
+                ann_csv.write("X,Y,Label\n")
 
-        else:
+        elif selected_sample in toreview_dict.keys():
+            # Download the image and CSV from Google Drive
             img_path = get_gdrive_image_path(drive, 
-                done_dict[selected_sample], image_dir, selected_sample)    
+                toreview_dict[selected_sample], image_dir, selected_sample)
+            ann_file_path = get_gdrive_csv_path(drive, 
+                toreview_dict[selected_sample], ann_dir, selected_sample)
+
+        elif selected_sample in done_dict.keys():
+            # Download the image and CSV from Google Drive
+            img_path = get_gdrive_image_path(drive, 
+                done_dict[selected_sample], image_dir, selected_sample)
             ann_file_path = get_gdrive_csv_path(drive, 
                 done_dict[selected_sample], ann_dir, selected_sample)
 
@@ -98,11 +107,6 @@ def load_sample(session_state, selected_sample):
     session_state['resized_image'] = image.resize((1280, int(scale*height)))
     session_state['height'] = int(scale*height)
     session_state['scale'] = scale
-
-    # Check if annotation file exists, if not create it
-    if not os.path.exists(ann_file_path):
-        with open(ann_file_path, 'w', encoding='utf-8') as ann_csv:
-            ann_csv.write("X,Y,Label\n")
 
     with open(ann_file_path, 'r', encoding='utf-8') as ann_csv:
         annotations = ann_csv.read()
@@ -120,35 +124,68 @@ def load_sample(session_state, selected_sample):
 
 
 
-def finish_annotation(session_state, selected_sample):
-
+def finish_annotation(session_state, selected_sample, target_dir):
     drive = session_state['drive']
-    done_dict = session_state['done_dict']
     todo_dict = session_state['todo_dict']
+    toreview_dict = session_state['toreview_dict']
+    done_dict = session_state['done_dict']
     folder_dict = session_state['folder_dict']
 
-    done_folder_id = folder_dict[anns_done_dir]['id']
+    target_folder_id = folder_dict[target_dir]['id']
 
     if selected_sample in todo_dict.keys():
+        # Caso: La imagen proviene de todo_dir
         file_list = todo_dict[selected_sample]
+
+        # Subir el archivo CSV local al directorio de destino
+        csv_path = f"{ann_dir}/{selected_sample}.csv"
+        upload_file_to_gdrive(drive, csv_path, target_folder_id)
+
+        # Mover la imagen al directorio de destino
         for file in file_list:
-            move_file(drive, file['id'], done_folder_id)
-    else:
+            move_file(drive, file['id'], target_folder_id)
+
+    elif selected_sample in toreview_dict.keys():
+        # Caso: La imagen proviene de toreview_dir
+        file_list = toreview_dict[selected_sample]
+
+        # Actualizar el archivo CSV en su ubicación actual
+        x_coords = []
+        y_coords = []
+        labels = []
+        for point in session_state['all_points']:
+            x_coords.append(point[0])
+            y_coords.append(point[1])
+            label_int = session_state['all_labels'][point]
+            labels.append(label_list[label_int])
+
+        update_gdrive_csv(drive, file_list, x_coords, y_coords, labels)
+
+        # Mover el archivo CSV al directorio de destino
+        for file in file_list:
+            if file['title'].endswith('.csv'):
+                move_file(drive, file['id'], target_folder_id)
+
+        # Mover la imagen al directorio de destino
+        for file in file_list:
+            if not file['title'].endswith('.csv'):
+                move_file(drive, file['id'], target_folder_id)
+
+    elif selected_sample in done_dict.keys():
+        # Caso: La imagen ya está en done_dir (no se mueve, pero se actualiza el CSV)
         file_list = done_dict[selected_sample]
 
-    x_coords = []
-    y_coords = []
-    labels = []
-    for point in session_state['all_points']:
-        x_coords.append(point[0])
-        y_coords.append(point[1])
-        label_int = session_state['all_labels'][point]
-        labels.append(label_list[label_int])
+        # Actualizar el archivo CSV en su ubicación actual
+        x_coords = []
+        y_coords = []
+        labels = []
+        for point in session_state['all_points']:
+            x_coords.append(point[0])
+            y_coords.append(point[1])
+            label_int = session_state['all_labels'][point]
+            labels.append(label_list[label_int])
 
-    update_gdrive_csv(drive, file_list, 
-        x_coords, y_coords, labels)
-
-
+        update_gdrive_csv(drive, file_list, x_coords, y_coords, labels)
 
 def ann_correction(session_state):
 
@@ -204,10 +241,17 @@ def ann_correction(session_state):
 
     # Add a button to the sidebar
     st.sidebar.header("Finalizar")
-    if st.sidebar.button("Finalizar correción"):
-        if 'selected_sample' in session_state:
-            finish_annotation(session_state, session_state['selected_sample'])
-            setup_drive(session_state) # Update drive
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("Finalizar anotación"):
+            if 'selected_sample' in session_state:
+                finish_annotation(session_state, session_state['selected_sample'], anns_done_dir)
+                setup_drive(session_state)  # Update drive
+    with col2:
+        if st.button("Mandar a revisión"):
+            if 'selected_sample' in session_state:
+                finish_annotation(session_state, session_state['selected_sample'], anns_toreview_dir)
+                setup_drive(session_state)  # Update drive
 
     # Get selected sample
     display_sample = st.selectbox("Elegir una muestra:", session_state['display_samples'])

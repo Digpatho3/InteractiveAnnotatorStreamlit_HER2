@@ -38,98 +38,44 @@ def get_drive(path_to_json):
     # Return drive.
     return drive
 
-def get_dicts(drive, todo_name, done_name, parent_folder_id=None):
-    """Get dictionaries for to-do files, done files and their folders.
-    
-    Parameters
-    ----------
-    drive : GoogleDrive
-        Drive as a PyDrive2 ``GoogleDrive`` object.
-    todo_name : str
-        Name of the folder containing to-do files.
-    done_name : str
-        Name of the folder containing done files.
-    parent_folder_id : str, optional
-        ID of the parent folder where `todo_name` and `done_name` are located.
-
-    Returns
-    -------
-    folder_dict : dict
-        Dictionary; folder names as keys and their associated 
-        ``GoogleDriveFile`` instances as values.
-    todo_dict : dict
-        Dictionary; keys are file names (without file extension), and 
-        values are lists of to-do files, as ``GoogleDriveFile`` 
-        instances, that share a specific file name. Note that if 
-        different type of files share the same file name, they'll be 
-        grouped into the same list.
-    done_dict : dict
-        Dictionary; keys are file names (without file extension), and 
-        values are lists of done files, as ``GoogleDriveFile`` 
-        instances, that share a specific file name. Note that if 
-        different type of files share the same file name, they'll be 
-        grouped into the same list.
-    """
+def get_dicts(drive, todo_name, toreview_name, done_name, parent_folder_id=None):
+    """Get dictionaries for to-do, to-review, and done files."""
     # Query to find folders
     query = f"trashed=false and mimeType='application/vnd.google-apps.folder'"
     if parent_folder_id:
         query += f" and '{parent_folder_id}' in parents"
 
-    # Folder Dictionary. Keys are these two folder names, and their values 
-    # are their associated GoogleDriveFile objects.
+    # Folder Dictionary
     folder_dict = {
         fname: gfile 
         for gfile in drive.ListFile({"q": query}).GetList() 
-        for fname in [todo_name, done_name] 
+        for fname in [todo_name, toreview_name, done_name] 
         if gfile['title'] == fname
     }
 
-    # Clear console
-    os.system('cls' if os.name == 'nt' else 'clear')
+    # Helper function to create dictionaries for each folder
+    def create_dict(folder_id):
+        return {
+            key: list(group) 
+            for key, group in groupby(
+                sorted(
+                    [
+                        gfile 
+                        for gfile in drive.ListFile({"q": 'trashed=false'}).GetList() 
+                        if gfile['parents'] 
+                        and folder_id in gfile['parents'][0].values()
+                    ], 
+                    key=lambda x: os.path.splitext(x['title'])[0],
+                ),
+                key=lambda x: os.path.splitext(x['title'])[0],
+            )
+        }
 
-    # Print all files in the drive
-    file_list = drive.ListFile({"q": 'trashed=false'}).GetList()
-    for file in file_list:
-        print('title: %s, id: %s' % (file['title'], file['id']))
+    todo_dict = create_dict(folder_dict[todo_name]['id'])
+    toreview_dict = create_dict(folder_dict[toreview_name]['id'])
+    done_dict = create_dict(folder_dict[done_name]['id'])
 
-    print("Folder Dictionary:", folder_dict)
-
-    # Similar dictionaries for every done and to-do files.
-    # Here, keys are their filenames [no file extenson], and values are lists 
-    # holding the corresponding files [images, csvs and jsons, should they exist.]
-    todo_dict = {
-        key: list(group) 
-        for key, group in groupby(
-            sorted(
-                [
-                    gfile 
-                    for gfile in drive.ListFile({"q": 'trashed=false'}).GetList() 
-                    if gfile['parents'] 
-                    and folder_dict[todo_name]['id'] in gfile['parents'][0].values()
-                ], 
-                key = lambda x: os.path.splitext(x['title'])[0],
-            ),
-            key = lambda x: os.path.splitext(x['title'])[0],
-        )
-    }
-    
-    done_dict = {
-        key: list(group) 
-        for key, group in groupby(
-            sorted(
-                [
-                    gfile 
-                    for gfile in drive.ListFile({"q": 'trashed=false'}).GetList() 
-                    if gfile['parents'] 
-                    and folder_dict[done_name]['id'] in gfile['parents'][0].values()
-                ], 
-                key = lambda x: os.path.splitext(x['title'])[0],
-            ),
-            key = lambda x: os.path.splitext(x['title'])[0],
-        )
-    }
-
-    return folder_dict, todo_dict, done_dict
+    return folder_dict, todo_dict, toreview_dict, done_dict
 
 def move_file(drive, file_id, folder_id):
     """Moves file to a specific folder.
@@ -491,6 +437,23 @@ def update_gdrive_json(drive, file_list, json_dict):
     
     # Upload.
     jsonfile.Upload()
+
+def upload_file_to_gdrive(drive, file_path, folder_id):
+    """Uploads a local file to Google Drive in the specified directory.
+
+    Parameters
+    ----------
+    drive : GoogleDrive
+        Instance of GoogleDrive from PyDrive2.
+    file_path : str
+        Path to the local file to be uploaded.
+    folder_id : str
+        ID of the destination directory in Google Drive.
+    """
+    file_name = os.path.basename(file_path)
+    gfile = drive.CreateFile({'title': file_name, 'parents': [{'id': folder_id}]})
+    gfile.SetContentFile(file_path)
+    gfile.Upload()
 
 if __name__ == '__main__':
     # Path to keys.
