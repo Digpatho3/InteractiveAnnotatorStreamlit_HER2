@@ -1,6 +1,7 @@
-
 import numpy as np
 from PIL import Image, ImageDraw
+
+import matplotlib.pyplot as plt
 
 from image_annotation import *
 from pydrive_utils import *
@@ -26,8 +27,7 @@ label_lists = {
     'Ki67': ['Positivo', 'Negativo', 'No importante'],
     'Estrógeno': ['Positivo 3+', 'Positivo 2+', 'Positivo 1+', 'Negativo', 'No importante'],
     'Progesterona': ['Positivo 3+', 'Positivo 2+', 'Positivo 1+', 'Negativo', 'No importante'],
-    # 'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente']
-    'HER2/neu': ['C3', 'C2', 'C1', 'I2', 'I1', 'AUS']
+    'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente', 'No importa']
 }
 label_list = label_lists['HER2/neu']
 
@@ -45,6 +45,11 @@ def setup_drive(session_state):
     session_state['done_dict'] = done_dict
     session_state['folder_dict'] = folder_dict
 
+     # Store sample names separately
+    session_state['todo_samples'] = [f"{sample_name} {todo_symbol}" for sample_name in todo_dict.keys()]
+    session_state['toreview_samples'] = [f"{sample_name} {toreview_symbol}" for sample_name in toreview_dict.keys()]
+    session_state['done_samples'] = [f"{sample_name} {done_symbol}" for sample_name in done_dict.keys()]
+
     # Combine all sample names with their corresponding symbols
     sample_list = {}
     for sample_name in todo_dict.keys():
@@ -59,17 +64,17 @@ def setup_drive(session_state):
 
 
 def load_sample(session_state, selected_sample):
-
-    # Check if selected sample is already downloaded
+    # Check if the selected sample is already downloaded
     img_path = None
-    ann_file_path = None
+    ann_file_path = f"{ann_dir}/{selected_sample}.csv"
+
+    # Verify if the image is already downloaded
     for file in os.listdir(image_dir):
         if os.path.splitext(file)[0].strip() == selected_sample.strip():
-            img_path = f"{image_dir}/{file}" 
-            ann_file_path = f"{ann_dir}/{selected_sample}.csv"
+            img_path = f"{image_dir}/{file}"
             break
 
-    # Download sample
+    # Download the image if it is not present
     if img_path is None:
         drive = session_state['drive']
         todo_dict = session_state['todo_dict']
@@ -77,35 +82,40 @@ def load_sample(session_state, selected_sample):
         done_dict = session_state['done_dict']
 
         if selected_sample in todo_dict.keys():
-            # Download the image from Google Drive
-            img_path = get_gdrive_image_path(drive, 
-                todo_dict[selected_sample], image_dir, selected_sample)
-            # Create an empty CSV file locally (do not attempt to download it)
-            ann_file_path = f"{ann_dir}/{selected_sample}.csv"
+            img_path = get_gdrive_image_path(drive, todo_dict[selected_sample], image_dir, selected_sample)
+
+        elif selected_sample in toreview_dict.keys():
+            img_path = get_gdrive_image_path(drive, toreview_dict[selected_sample], image_dir, selected_sample)
+
+        elif selected_sample in done_dict.keys():
+            img_path = get_gdrive_image_path(drive, done_dict[selected_sample], image_dir, selected_sample)
+
+    # Verify if the CSV file exists and is not empty
+    if not os.path.exists(ann_file_path) or os.stat(ann_file_path).st_size == 0:
+        drive = session_state['drive']
+        todo_dict = session_state['todo_dict']
+        toreview_dict = session_state['toreview_dict']
+        done_dict = session_state['done_dict']
+
+        if selected_sample in todo_dict.keys():
+            # Create an empty CSV file locally
             with open(ann_file_path, 'w', encoding='utf-8') as ann_csv:
                 ann_csv.write("X,Y,Label\n")
 
         elif selected_sample in toreview_dict.keys():
-            # Download the image and CSV from Google Drive
-            img_path = get_gdrive_image_path(drive, 
-                toreview_dict[selected_sample], image_dir, selected_sample)
-            ann_file_path = get_gdrive_csv_path(drive, 
-                toreview_dict[selected_sample], ann_dir, selected_sample)
+            ann_file_path = get_gdrive_csv_path(drive, toreview_dict[selected_sample], ann_dir, selected_sample)
 
         elif selected_sample in done_dict.keys():
-            # Download the image and CSV from Google Drive
-            img_path = get_gdrive_image_path(drive, 
-                done_dict[selected_sample], image_dir, selected_sample)
-            ann_file_path = get_gdrive_csv_path(drive, 
-                done_dict[selected_sample], ann_dir, selected_sample)
+            ann_file_path = get_gdrive_csv_path(drive, done_dict[selected_sample], ann_dir, selected_sample)
 
-    image_file_name = selected_sample 
+    # Process the image and the CSV file
+    image_file_name = selected_sample
     image = Image.open(img_path)
     height = image.size[1]
-    width  = image.size[0]
-    scale = 1280/width
-    session_state['resized_image'] = image.resize((1280, int(scale*height)))
-    session_state['height'] = int(scale*height)
+    width = image.size[0]
+    scale = 1280 / width
+    session_state['resized_image'] = image.resize((1280, int(scale * height)))
+    session_state['height'] = int(scale * height)
     session_state['scale'] = scale
 
     with open(ann_file_path, 'r', encoding='utf-8') as ann_csv:
@@ -121,8 +131,6 @@ def load_sample(session_state, selected_sample):
 
     # This must be done last
     session_state['load_succesful'] = True
-
-
 
 def finish_annotation(session_state, selected_sample, target_dir):
     drive = session_state['drive']
@@ -213,11 +221,12 @@ def ann_correction(session_state):
 
     st.sidebar.header("Visualización")
     with st.sidebar:
+        point_count = len(session_state['all_points']) if 'all_points' in session_state else 0
         point_vis = st.checkbox(
-            "Mostrar puntos", 
+            f"Mostrar puntos ({point_count})", 
             value=True, 
             help="Activa o desactiva la visualización de los puntos en la imagen."
-        )            
+            )
         zoom = st.number_input(
             "Zoom", 
             min_value=1, 
@@ -227,16 +236,19 @@ def ann_correction(session_state):
         )
 
 
-
     # Sidebar content
     st.sidebar.header("Anotación de imágenes")
     with st.sidebar:
         col1, col2 = st.columns([2, 2])
         with col1:
             session_state['action'] = st.selectbox("Acción:", actions)
-
+            enabled_dropdown = st.selectbox(
+                "Estado:",
+                ["Sin anotar", "Revisar", "OK"],
+                index=0
+                )
         with col2:
-            category = st.selectbox("Categoría:", categories)
+            category = st.selectbox("Marcador:", categories, index=categories.index('HER2/neu')) # hardcoded
             session_state['label'] = st.selectbox("Clase:", label_lists[category])
 
     # Add a button to the sidebar
@@ -253,14 +265,53 @@ def ann_correction(session_state):
                 finish_annotation(session_state, session_state['selected_sample'], anns_toreview_dir)
                 setup_drive(session_state)  # Update drive
 
-    # Get selected sample
-    display_sample = st.selectbox("Elegir una muestra:", session_state['display_samples'])
-    selected_sample = session_state['sample_names'][
-        session_state['display_samples'].index(display_sample)]
-    
+    # Get selected sample based on the chosen category
+    selected_sample = None
+    if enabled_dropdown == "Sin anotar":
+        if session_state['todo_samples']:
+            selected_sample_option = st.selectbox(
+                f"Muestras sin anotar ({len(session_state['todo_samples'])}):", 
+                session_state['todo_samples']
+            )
+            if selected_sample_option:
+                selected_sample = selected_sample_option.rsplit(' ', 1)[0]
+        else:
+            st.warning("No hay muestras sin anotar disponibles.")
+    elif enabled_dropdown == "Revisar":
+        if session_state['toreview_samples']:
+            selected_sample_option = st.selectbox(
+                f"Muestras para revisar ({len(session_state['toreview_samples'])}):", 
+                session_state['toreview_samples']
+            )
+            if selected_sample_option:
+                selected_sample = selected_sample_option.rsplit(' ', 1)[0]
+        else:
+            st.warning("No hay muestras para revisar disponibles.")
+    elif enabled_dropdown == "OK":
+        if session_state['done_samples']:
+            selected_sample_option = st.selectbox(
+                f"Muestras OK ({len(session_state['done_samples'])}):", 
+                session_state['done_samples']
+            )
+            if selected_sample_option:
+                selected_sample = selected_sample_option.rsplit(' ', 1)[0]
+        else:
+            st.warning("No hay muestras OK disponibles.")
+
+    # Clear previously loaded sample if no new sample is selected
+    if not selected_sample:
+        session_state['selected_sample'] = None
+        session_state['load_succesful'] = False
+        return
+
+    # Ensure the dropdown for selecting samples remains visible
+    if selected_sample is None:
+        st.warning("Por favor, selecciona una muestra del desplegable habilitado.")
+        selected_sample = session_state.get('selected_sample', None)
+
     # We check for changes on the selected sample
     if 'selected_sample' not in session_state or \
-        session_state['selected_sample']!=selected_sample:
+        session_state['selected_sample'] != selected_sample:
 
         # We update the selected sample and trigger
         # the loading of the sample 
@@ -269,8 +320,8 @@ def ann_correction(session_state):
 
     # We check if the last load was succesful
     if 'load_succesful' not in session_state or \
-        session_state['load_succesful']!=True:
-       load_sample(session_state, selected_sample)
+        session_state['load_succesful'] != True:
+        load_sample(session_state, selected_sample)
 
     if 'image_file_name' in session_state:
         image_file_name  = session_state['image_file_name']
@@ -319,6 +370,20 @@ def ann_correction(session_state):
             point_width=5*point_vis,
             zoom=zoom,
         )
+
+        st.subheader("Vista previa de las clases anotadas")
+        fig, ax = plt.subplots(figsize=(10, 1))
+
+        label_colors = get_colormap(label_list)
+
+        for i, label in enumerate(label_list):
+            ax.scatter(i, 0, color=label_colors[label], s=50)
+            ax.text(i, -0.1, label, ha='center', va='top', fontsize=7)
+
+        ax.set_xlim(-1, len(label_list))
+        ax.set_ylim(-0.5, 0.5)
+        ax.axis('off') 
+        st.pyplot(fig)
         
         # Update points and labels in session state if any changes are made
         if new_labels is not None:

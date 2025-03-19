@@ -1,5 +1,6 @@
 import streamlit as st
 from streamlit_image_annotation import pointdet
+from streamlit_image_annotation import get_colormap
 import io
 import csv
 from PIL import Image
@@ -19,8 +20,7 @@ label_lists = {
     'Ki67': ['Positivo', 'Negativo', 'No importante'],
     'Estrógeno': ['Positivo', 'Negativo', 'No importante'],
     'Progesterona': ['Positivo', 'Negativo', 'No importante'],
-    'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente']
-    # 'HER2/neu': ['C3', 'C2', 'C1', 'I2', 'I1', 'AUS']
+    'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente', 'No importa']
 }
 label_list = label_lists['HER2/neu']
 
