@@ -15,5 +15,6 @@ __pycache__/
 *.json
 *.txt
 *.log
+*.toml
 
 "node_modules/"

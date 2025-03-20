@@ -391,15 +391,22 @@ def ann_correction(session_state):
         for label_id in all_labels.values():
             class_counts[label_list[label_id]] += 1
 
-        total_points = sum(class_counts.values())
+        do_not_care_label = label_list[-1]
 
+        total_points = sum(count for label, count in class_counts.items() if label != do_not_care_label)
+
+        # Prepare the preview text
         preview_text = f"**Sample:** {image_file_name}\n\n"
+        preview_text += f"**Total puntos anotados:** {total_points}\n\n"
         preview_text += "| Clase | Cantidad | Porcentaje |\n"
         preview_text += "|-------|----------|------------|\n"
-        preview_text += f"| **Total** | {total_points} | 100.00% |\n"
         for label, count in class_counts.items():
-            percentage = (count / total_points * 100) if total_points > 0 else 0
-            preview_text += f"| **{label}** | {count} | {percentage:.2f}% |\n"
+            if label == do_not_care_label:
+                preview_text += "|=======|==========|============|\n"
+                preview_text += f"| **{label}** | {count} | |\n"
+            else:
+                percentage = (count / total_points * 100) if total_points > 0 else 0
+                preview_text += f"| **{label}** | {count} | {percentage:.2f}% |\n"
 
         st.markdown(preview_text)
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
