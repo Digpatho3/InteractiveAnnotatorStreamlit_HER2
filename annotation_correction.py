@@ -193,16 +193,6 @@ def finish_annotation(session_state, selected_sample, target_dir):
                     csv_path = f"{ann_dir}/{selected_sample}.csv"
                     upload_file_to_gdrive(drive, csv_path, target_folder_id)
 
-            # Handle transitions from 'discarded_dict'
-            elif source_name == 'discarded_dict':
-                if target_dir == anns_discarded_dir:
-                    st.warning(f"El sample '{selected_sample}' ya está descartado.")
-                    return
-                if target_dir in [anns_toreview_dir, anns_done_dir]:
-                    if not session_state['all_points']:
-                        st.warning(f"No hay puntos anotados para el sample '{selected_sample}'.")
-                        return
-
             # No point verification needed for 'toreview_dict' or 'done_dict'
             update_and_move_files(file_list, update_csv=(source_name != 'todo_dict'))
 
