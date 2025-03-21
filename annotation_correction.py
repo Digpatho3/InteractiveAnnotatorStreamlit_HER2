@@ -16,56 +16,53 @@ image_dir  = "./images"
 ann_dir    = "./annotations"
 report_dir = "./reports"
 
+states = ['Sin anotar' , 
+          'Revisar', 
+          'OK', 
+          'Descartado']
 anns_todo_dir = 'anotaciones_a_hacer'
 anns_toreview_dir = 'anotaciones_a_revisar'
 anns_done_dir = 'anotaciones_ok'
+anns_discarded_dir = 'anotaciones_descartadas'
 
 parent_folder_id = '1Y423-t-9GesYP1RwRRmnBnQl8bRYEpAC' # Shared folder
-
-biomarkers = ['Ki67', 'Estrógeno', 'Progesterona', 'HER2/neu']
-label_lists = {
-    'Ki67': ['Positivo', 'Negativo', 'No importante'],
-    'Estrógeno': ['Positivo 3+', 'Positivo 2+', 'Positivo 1+', 'Negativo', 'No importante'],
-    'Progesterona': ['Positivo 3+', 'Positivo 2+', 'Positivo 1+', 'Negativo', 'No importante'],
-    'HER2/neu': ['Completa 3+', 'Completa 2+', 'Completa 1+', 'Incompleta 2+', 'Incompleta 1+', 'Ausente', 'No importa']
-}
-label_list = label_lists['HER2/neu']
 
 path_to_json_key = "pydrive_credentials.json"
 
 def setup_drive(session_state):
     drive = get_drive(path_to_json_key)
 
-    folder_dict, todo_dict, toreview_dict, done_dict = \
-        get_dicts(drive, anns_todo_dir, anns_toreview_dir, anns_done_dir, parent_folder_id)
+    folder_dict, todo_dict, toreview_dict, done_dict, discarded_dict = \
+        get_dicts(drive, anns_todo_dir, anns_toreview_dir, anns_done_dir, anns_discarded_dir, parent_folder_id)
 
     session_state['drive'] = drive
     session_state['todo_dict'] = todo_dict
     session_state['toreview_dict'] = toreview_dict
     session_state['done_dict'] = done_dict
+    session_state['discarded_dict'] = discarded_dict
     session_state['folder_dict'] = folder_dict
 
      # Store sample names separately
     session_state['todo_samples'] = [f"{sample_name} {todo_symbol}" for sample_name in todo_dict.keys()]
 
-    # Add metadata (last editor and last edit time) for toreview and done samples
-    session_state['toreview_samples'] = []
-    for sample_name, file_list in toreview_dict.items():
-        metadata = get_file_metadata(drive, file_list)
-        last_editor = metadata['last_editor']
-        last_modified_date = metadata['last_modified_date']
-        session_state['toreview_samples'].append(
-            f"{sample_name} {toreview_symbol} (Editor: {last_editor}, Fecha: {last_modified_date})"
-        )
+    def add_metadata_to_samples(sample_dict, symbol):
+        samples = []
+        for sample_name, file_list in sample_dict.items():
+            # Extract metadata from the first file in the list
+            first_file = file_list[0]
+            last_editor = first_file.get('lastModifyingUser', {}).get('displayName', 'Desconocido')
+            if "@" in last_editor:  # If it's an email, take the part before '@'
+                last_editor = last_editor.split("@")[0]
+            last_modified_date = first_file.get('modifiedDate', 'Desconocida')
+            samples.append(
+                f"{sample_name} {symbol} (Editor: {last_editor}, Fecha: {last_modified_date})"
+            )
+        return samples
 
-    session_state['done_samples'] = []
-    for sample_name, file_list in done_dict.items():
-        metadata = get_file_metadata(drive, file_list)
-        last_editor = metadata['last_editor']
-        last_modified_date = metadata['last_modified_date']
-        session_state['done_samples'].append(
-            f"{sample_name} {done_symbol} (Editor: {last_editor}, Fecha: {last_modified_date})"
-        )
+    # Add metadata for toreview, done, and discarded samples
+    session_state['toreview_samples'] = add_metadata_to_samples(toreview_dict, toreview_symbol)
+    session_state['done_samples'] = add_metadata_to_samples(done_dict, done_symbol)
+    session_state['discarded_samples'] = add_metadata_to_samples(discarded_dict, discard_symbol)
 
 
     # Combine all sample names with their corresponding symbols
@@ -76,6 +73,8 @@ def setup_drive(session_state):
         sample_list[f"{sample_name} {toreview_symbol}"] = sample_name
     for sample_name in done_dict.keys():
         sample_list[f"{sample_name} {done_symbol}"] = sample_name
+    for sample_name in discarded_dict.keys():
+        sample_list[f"{sample_name} {discard_symbol}"] = sample_name
 
     session_state['display_samples'] = list(sample_list.keys())
     session_state['sample_names'] = list(sample_list.values())
@@ -152,66 +151,59 @@ def load_sample(session_state, selected_sample):
 
 def finish_annotation(session_state, selected_sample, target_dir):
     drive = session_state['drive']
-    todo_dict = session_state['todo_dict']
-    toreview_dict = session_state['toreview_dict']
-    done_dict = session_state['done_dict']
     folder_dict = session_state['folder_dict']
-
     target_folder_id = folder_dict[target_dir]['id']
 
-    if selected_sample in todo_dict.keys():
-        # Caso: La imagen proviene de todo_dir
-        file_list = todo_dict[selected_sample]
+    # Helper function to update and move files
+    def update_and_move_files(file_list, update_csv=True):
+        if update_csv:
+            # Process points and labels
+            x_coords, y_coords, labels = zip(*[
+                (point[0], point[1], label_list[session_state['all_labels'][point]])
+                for point in session_state['all_points']
+            ])
 
-        # Subir el archivo CSV local al directorio de destino
-        csv_path = f"{ann_dir}/{selected_sample}.csv"
-        upload_file_to_gdrive(drive, csv_path, target_folder_id)
+            # Update the CSV file in Google Drive
+            update_gdrive_csv(drive, file_list, x_coords, y_coords, labels)
 
-        # Mover la imagen al directorio de destino
+        # Move the files to the target directory
         for file in file_list:
             move_file(drive, file['id'], target_folder_id)
 
-    elif selected_sample in toreview_dict.keys():
-        # Caso: La imagen proviene de toreview_dir
-        file_list = toreview_dict[selected_sample]
+    # Determine the source directory and process accordingly
+    source_dicts = {
+        'todo_dict': session_state['todo_dict'],
+        'toreview_dict': session_state['toreview_dict'],
+        'done_dict': session_state['done_dict'],
+        'discarded_dict': session_state['discarded_dict']
+    }
 
-        # Actualizar el archivo CSV en su ubicación actual
-        x_coords = []
-        y_coords = []
-        labels = []
-        for point in session_state['all_points']:
-            x_coords.append(point[0])
-            y_coords.append(point[1])
-            label_int = session_state['all_labels'][point]
-            labels.append(label_list[label_int])
+    for source_name, source_dict in source_dicts.items():
+        if selected_sample in source_dict:
+            file_list = source_dict[selected_sample]
 
-        update_gdrive_csv(drive, file_list, x_coords, y_coords, labels)
+            # Handle transitions from 'todo_dict'
+            if source_name == 'todo_dict':
+                if target_dir in [anns_toreview_dir, anns_done_dir]:
+                    if not session_state['all_points']:
+                        st.warning(f"No hay puntos anotados para el sample '{selected_sample}'.")
+                        return
+                elif target_dir == anns_discarded_dir:
+                    csv_path = f"{ann_dir}/{selected_sample}.csv"
+                    upload_file_to_gdrive(drive, csv_path, target_folder_id)
 
-        # Mover el archivo CSV al directorio de destino
-        for file in file_list:
-            if file['title'].endswith('.csv'):
-                move_file(drive, file['id'], target_folder_id)
+            # Handle transitions from 'discarded_dict'
+            elif source_name == 'discarded_dict':
+                if target_dir == anns_discarded_dir:
+                    st.warning(f"El sample '{selected_sample}' ya está descartado.")
+                    return
+                if target_dir in [anns_toreview_dir, anns_done_dir]:
+                    if not session_state['all_points']:
+                        st.warning(f"No hay puntos anotados para el sample '{selected_sample}'.")
+                        return
 
-        # Mover la imagen al directorio de destino
-        for file in file_list:
-            if not file['title'].endswith('.csv'):
-                move_file(drive, file['id'], target_folder_id)
-
-    elif selected_sample in done_dict.keys():
-        # Caso: La imagen ya está en done_dir (no se mueve, pero se actualiza el CSV)
-        file_list = done_dict[selected_sample]
-
-        # Actualizar el archivo CSV en su ubicación actual
-        x_coords = []
-        y_coords = []
-        labels = []
-        for point in session_state['all_points']:
-            x_coords.append(point[0])
-            y_coords.append(point[1])
-            label_int = session_state['all_labels'][point]
-            labels.append(label_list[label_int])
-
-        update_gdrive_csv(drive, file_list, x_coords, y_coords, labels)
+            # No point verification needed for 'toreview_dict' or 'done_dict'
+            update_and_move_files(file_list, update_csv=(source_name != 'todo_dict'))
 
 def ann_correction(session_state):
 
@@ -257,30 +249,29 @@ def ann_correction(session_state):
     # Sidebar content
     st.sidebar.header("Anotación de imágenes")
     with st.sidebar:
-        col1, col2 = st.columns([2, 2])
-        with col1:
-            session_state['action'] = st.selectbox("Acción:", actions)
-            enabled_dropdown = st.selectbox(
-                "Estado:",
-                ["Sin anotar", "Revisar", "OK"],
-                index=0
-                )
-        with col2:
-            category = st.selectbox("Marcador:", categories, index=categories.index('HER2/neu')) # hardcoded
-            session_state['label'] = st.selectbox("Clase:", label_lists[category])
+        # Hardcode the category to 'HER2/neu' and disable the selectbox
+        category = 'HER2/neu'
+        st.selectbox("Marcador:", [category], index=0, disabled=True)  # Disabled selectbox
+        enabled_dropdown = st.selectbox("Estado:", states, index=0)
+        session_state['label'] = st.selectbox("Clase:", label_lists[category])
+        session_state['action'] = st.selectbox("Acción:", actions)
 
     # Add a button to the sidebar
     st.sidebar.header("Finalizar")
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        if st.button("Finalizar anotación"):
+    with st.sidebar:
+        if st.button(f"{done_symbol} Finalizar anotación"):
             if 'selected_sample' in session_state:
                 finish_annotation(session_state, session_state['selected_sample'], anns_done_dir)
                 setup_drive(session_state)  # Update drive
-    with col2:
-        if st.button("Mandar a revisión"):
+
+        if st.button(f"{toreview_symbol} Mandar a revisión"):
             if 'selected_sample' in session_state:
                 finish_annotation(session_state, session_state['selected_sample'], anns_toreview_dir)
+                setup_drive(session_state)  # Update drive
+
+        if st.button(f"{discard_symbol} Descartar"):
+            if 'selected_sample' in session_state:
+                finish_annotation(session_state, session_state['selected_sample'], anns_discarded_dir)
                 setup_drive(session_state)  # Update drive
 
     # Get selected sample based on the chosen category
@@ -317,6 +308,19 @@ def ann_correction(session_state):
                 selected_sample = selected_sample_option.rsplit(' ')[0]
         else:
             st.warning("No hay muestras OK disponibles.")
+    elif enabled_dropdown == "Descartado":
+        if session_state['discarded_samples']:
+            selected_sample_option = st.selectbox(
+                f"Muestras descartadas ({len(session_state['discarded_samples'])}):", 
+                session_state['discarded_samples']
+            )
+            if selected_sample_option:
+                # Extract the sample name before the metadata
+                selected_sample = selected_sample_option.rsplit(' ')[0]
+        else:
+            st.warning("No hay muestras descartadas disponibles.")
+    else:
+        st.warning("Por favor, selecciona un estado válido.")
 
     # Clear previously loaded sample if no new sample is selected
     if not selected_sample:

@@ -39,8 +39,8 @@ def get_drive(path_to_json):
     # Return drive.
     return drive
 
-def get_dicts(drive, todo_name, toreview_name, done_name, parent_folder_id=None):
-    """Get dictionaries for to-do, to-review, and done files."""
+def get_dicts(drive, todo_name, toreview_name, done_name, discarded_name, parent_folder_id=None):
+    """Get dictionaries for to-do, to-review, done, and discarded files with metadata."""
     # Query to find folders
     query = f"trashed=false and mimeType='application/vnd.google-apps.folder'"
     if parent_folder_id:
@@ -50,33 +50,34 @@ def get_dicts(drive, todo_name, toreview_name, done_name, parent_folder_id=None)
     folder_dict = {
         fname: gfile 
         for gfile in drive.ListFile({"q": query}).GetList() 
-        for fname in [todo_name, toreview_name, done_name] 
+        for fname in [todo_name, toreview_name, done_name, discarded_name] 
         if gfile['title'] == fname
     }
 
     # Helper function to create dictionaries for each folder
     def create_dict(folder_id):
-        return {
-            key: list(group) 
-            for key, group in groupby(
-                sorted(
-                    [
-                        gfile 
-                        for gfile in drive.ListFile({"q": 'trashed=false'}).GetList() 
-                        if gfile['parents'] 
-                        and folder_id in gfile['parents'][0].values()
-                    ], 
-                    key=lambda x: os.path.splitext(x['title'])[0],
-                ),
-                key=lambda x: os.path.splitext(x['title'])[0],
-            )
-        }
+        # List all files in the folder and include metadata in the query
+        file_list = drive.ListFile({
+            "q": f"trashed=false and '{folder_id}' in parents",
+            "fields": "items(id, title, mimeType, lastModifyingUser/displayName, modifiedDate)"
+        }).GetList()
+
+        # Group files by their base name (without extension)
+        grouped_files = {}
+        for file in file_list:
+            base_name = os.path.splitext(file['title'])[0]
+            if base_name not in grouped_files:
+                grouped_files[base_name] = []
+            grouped_files[base_name].append(file)
+
+        return grouped_files
 
     todo_dict = create_dict(folder_dict[todo_name]['id'])
     toreview_dict = create_dict(folder_dict[toreview_name]['id'])
     done_dict = create_dict(folder_dict[done_name]['id'])
+    discarded_dict = create_dict(folder_dict[discarded_name]['id'])
 
-    return folder_dict, todo_dict, toreview_dict, done_dict
+    return folder_dict, todo_dict, toreview_dict, done_dict, discarded_dict
 
 def move_file(drive, file_id, folder_id):
     """Moves file to a specific folder.
@@ -134,9 +135,14 @@ def get_gdrive_csv_path(drive, file_list, dir, name='zdummy'):
     if gfile is None:
         raise FileNotFoundError(f"Specified csv file doesn't exist.")
 
-    dummy_path = f'{dir}/{name}.{gfile["fileExtension"]}'
-    # Download csv file to a dummy path.
-    drive.CreateFile({'id': gfile['id']}).GetContentFile(dummy_path)
+    # Get extension without the dot
+    file_extension = os.path.splitext(gfile["title"])[1].lstrip(".")  
+
+    # Construct the path for the downloaded file
+    dummy_path = f'{dir}/{name}.{file_extension}' 
+
+    # Download the csv file to the specified path
+    drive.CreateFile({'id': gfile['id']}).GetContentFile(dummy_path) 
 
     return dummy_path
 
@@ -215,9 +221,14 @@ def get_gdrive_image_path(drive, file_list, dir, name='zdummy'):
 
     # print(file_list)
 
-    dummy_path = f'{dir}/{name}.{gfile["fileExtension"]}'
-    # Download csv file to a dummy path.
-    drive.CreateFile({'id': gfile['id']}).GetContentFile(dummy_path)
+    # Get extension without the dot
+    file_extension = os.path.splitext(gfile["title"])[1].lstrip(".")  
+
+    # Construct the path for the downloaded file
+    dummy_path = f'{dir}/{name}.{file_extension}' 
+
+    # Download the image file to the specified path
+    drive.CreateFile({'id': gfile['id']}).GetContentFile(dummy_path) 
 
     return dummy_path
 
