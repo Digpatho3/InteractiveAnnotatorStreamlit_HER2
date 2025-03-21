@@ -108,7 +108,7 @@ def update_results(session_state, all_points, all_labels, file_name):
         Cantidad total de elementos: {total}
         """
     elif category == "HER2/neu":
-        total = sum(labels.count(i) for i in range(len(label_list)))
+        total = sum(labels.count(i) for i in range(len(label_list) - 1))
         if total == 0:
             total = 1  # Avoid division by zero
 
@@ -125,7 +125,7 @@ def update_results(session_state, all_points, all_labels, file_name):
         Incompleta 1+: {labels.count(4)} - Porcentaje: {100 * labels.count(4) / total:.2f}%
         Ausente: {labels.count(5)} - Porcentaje: {100 * labels.count(5) / total:.2f}%
         ---
-        Total: {total}
+        Total: {total} - Porcentaje: {100 * total / total:.2f}%
         ---
         No importa: {labels.count(6)}
         """
