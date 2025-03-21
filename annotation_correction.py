@@ -43,9 +43,6 @@ def setup_drive(session_state):
     session_state['discarded_dict'] = discarded_dict
     session_state['folder_dict'] = folder_dict
 
-     # Store sample names separately
-    session_state['todo_samples'] = [f"{sample_name} {todo_symbol}" for sample_name in todo_dict.keys()]
-
     def add_metadata_to_samples(sample_dict, symbol):
         samples = []
         for sample_name, file_list in sample_dict.items():
@@ -60,7 +57,8 @@ def setup_drive(session_state):
             )
         return samples
 
-    # Add metadata for toreview, done, and discarded samples
+    # Store samples with metadata separately
+    session_state['todo_samples'] = add_metadata_to_samples(todo_dict, todo_symbol)
     session_state['toreview_samples'] = add_metadata_to_samples(toreview_dict, toreview_symbol)
     session_state['done_samples'] = add_metadata_to_samples(done_dict, done_symbol)
     session_state['discarded_samples'] = add_metadata_to_samples(discarded_dict, discard_symbol)
