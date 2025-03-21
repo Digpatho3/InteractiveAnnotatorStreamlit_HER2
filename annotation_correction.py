@@ -275,53 +275,60 @@ def ann_correction(session_state):
                 finish_annotation(session_state, session_state['selected_sample'], anns_discarded_dir)
                 setup_drive(session_state)  # Update drive
 
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Get selected sample based on the chosen category
     selected_sample = None
-    if enabled_dropdown == "Sin anotar":
-        if session_state['todo_samples']:
-            selected_sample_option = st.selectbox(
-                f"Muestras sin anotar ({len(session_state['todo_samples'])}):", 
-                session_state['todo_samples']
-            )
-            if selected_sample_option:
-                selected_sample = selected_sample_option.rsplit(' ', 1)[0]
+
+    col1, col2 = st.columns(2)
+
+    with col2:
+        sort_option = st.selectbox(
+            "Ordenamiento:",
+            options=["00000 ➡️ 99999",
+                     "99999 ➡️ 00000", 
+                     "Recientes primero", 
+                     "Antiguos primero", 
+                     "Editor"],
+            index=0
+        )
+
+    def sort_samples(samples, sort_by):
+        if sort_by == "00000 ➡️ 99999":
+            return sorted(samples, key=lambda x: x.rsplit(' ', 1)[0])
+        elif sort_by == "99999 ➡️ 00000":
+            return sorted(samples, key=lambda x: x.rsplit(' ', 1)[0], reverse=True)
+        elif sort_by == "Recientes primero":
+            return sorted(samples, key=lambda x: x.split("Fecha: ")[-1].strip(), reverse=True)
+        elif sort_by == "Antiguos primero":
+            return sorted(samples, key=lambda x: x.split("Fecha: ")[-1].strip())
+        elif sort_by == "Editor":
+            return sorted(samples, key=lambda x: x.split("Editor: ")[-1].split(",")[0].strip())
+        return samples
+
+    sample_dict = {
+        "Sin anotar": ("todo_samples", "Muestras sin anotar"),
+        "Revisar": ("toreview_samples", "Muestras para revisar"),
+        "OK": ("done_samples", "Muestras OK"),
+        "Descartado": ("discarded_samples", "Muestras descartadas")
+    }
+
+    with col1:
+        if enabled_dropdown in sample_dict:
+            sample_key, label = sample_dict[enabled_dropdown]
+            samples = session_state.get(sample_key, [])
+            if samples:
+                sorted_samples = sort_samples(samples, sort_option)
+                selected_sample_option = st.selectbox(
+                    f"{label} ({len(sorted_samples)}):", 
+                    sorted_samples
+                )
+                if selected_sample_option:
+                    selected_sample = selected_sample_option.split(' ', 1)[0]
+            else:
+                st.warning(f"No hay {label.lower()} disponibles.")
         else:
-            st.warning("No hay muestras sin anotar disponibles.")
-    elif enabled_dropdown == "Revisar":
-        if session_state['toreview_samples']:
-            selected_sample_option = st.selectbox(
-                f"Muestras para revisar ({len(session_state['toreview_samples'])}):", 
-                session_state['toreview_samples']
-            )
-            if selected_sample_option:
-                # Extract the sample name before the metadata
-                selected_sample = selected_sample_option.rsplit(' ')[0]
-        else:
-            st.warning("No hay muestras para revisar disponibles.")
-    elif enabled_dropdown == "OK":
-        if session_state['done_samples']:
-            selected_sample_option = st.selectbox(
-                f"Muestras OK ({len(session_state['done_samples'])}):", 
-                session_state['done_samples']
-            )
-            if selected_sample_option:
-                # Extract the sample name before the metadata
-                selected_sample = selected_sample_option.rsplit(' ')[0]
-        else:
-            st.warning("No hay muestras OK disponibles.")
-    elif enabled_dropdown == "Descartado":
-        if session_state['discarded_samples']:
-            selected_sample_option = st.selectbox(
-                f"Muestras descartadas ({len(session_state['discarded_samples'])}):", 
-                session_state['discarded_samples']
-            )
-            if selected_sample_option:
-                # Extract the sample name before the metadata
-                selected_sample = selected_sample_option.rsplit(' ')[0]
-        else:
-            st.warning("No hay muestras descartadas disponibles.")
-    else:
-        st.warning("Por favor, selecciona un estado válido.")
+            st.warning("Por favor, selecciona un estado válido.")
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     # Clear previously loaded sample if no new sample is selected
     if not selected_sample:
