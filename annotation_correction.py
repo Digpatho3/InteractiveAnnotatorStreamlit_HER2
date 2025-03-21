@@ -150,7 +150,7 @@ def load_sample(session_state, selected_sample):
     # This must be done last
     session_state['load_succesful'] = True
 
-def finish_annotation(session_state, selected_sample, target_dir):
+def finish_annotation(session_state, selected_sample, target_dir, delete_csv=False):
     drive = session_state['drive']
     folder_dict = session_state['folder_dict']
     target_folder_id = folder_dict[target_dir]['id']
@@ -182,6 +182,20 @@ def finish_annotation(session_state, selected_sample, target_dir):
     for source_name, source_dict in source_dicts.items():
         if selected_sample in source_dict:
             file_list = source_dict[selected_sample]
+
+            # Handle the new action: Delete CSV and move to "todo"
+            if delete_csv:
+                # Delete the CSV file in Google Drive
+                for file in file_list:
+                    if file['mimeType'] == 'text/csv':
+                        drive.CreateFile({'id': file['id']}).Delete()
+
+                # Move the image to the target directory
+                for file in file_list:
+                    if file['mimeType'].startswith('image/'):
+                        move_file(drive, file['id'], target_folder_id)
+
+                return
 
             # Handle transitions from 'todo_dict'
             if source_name == 'todo_dict':
@@ -243,7 +257,14 @@ def ann_correction(session_state):
         # Hardcode the category to 'HER2/neu' and disable the selectbox
         category = 'HER2/neu'
         st.selectbox("Marcador:", [category], index=0, disabled=True)  # Disabled selectbox
-        enabled_dropdown = st.selectbox("Estado:", states, index=0)
+        enabled_dropdown = st.selectbox(
+            "Estado:", 
+            [f"{todo_symbol} {states[0]}", 
+             f"{toreview_symbol} {states[1]}", 
+             f"{done_symbol} {states[2]}", 
+             f"{discard_symbol} {states[3]}"], 
+            index=0
+        ).split(' ', 1)[1]
         session_state['label'] = st.selectbox("Clase:", label_lists[category])
         session_state['action'] = st.selectbox("Acción:", actions)
 
@@ -257,9 +278,17 @@ def ann_correction(session_state):
                     "---",
                     f"{done_symbol} Finalizar anotación",
                     f"{toreview_symbol} Mandar a revisión",
-                    f"{discard_symbol} Descartar"
+                    f"{discard_symbol} Descartar",
+                    f"{todo_symbol} Reiniciar"
                 ],
-                index=0
+                index=0,
+                help=(
+                    "Selecciona una acción para la muestra actual:\n"
+                    f"- {done_symbol} Finalizar anotación: Mueve la muestra a 'OK'.\n"
+                    f"- {toreview_symbol} Mandar a revisión: Mueve la muestra a 'Revisar'.\n"
+                    f"- {discard_symbol} Descartar: Mueve la muestra a 'Descartado'.\n"
+                    f"- {todo_symbol} Reiniciar: Borra las anotaciones y mueve la muestra a 'Sin anotar'."
+                )
             )
 
             # Every form must have a submit button
@@ -277,6 +306,9 @@ def ann_correction(session_state):
                     elif action == f"{discard_symbol} Descartar":
                         finish_annotation(session_state, session_state['selected_sample'], anns_discarded_dir)
                         st.success(f"Muestra '{session_state['selected_sample']}' descartada.")
+                    elif action == f"{todo_symbol} Reiniciar":
+                        finish_annotation(session_state, session_state['selected_sample'], anns_todo_dir, delete_csv=True)
+                        st.success(f"Datos borrados y muestra '{session_state['selected_sample']}' movida a 'Sin anotar'.")
                     setup_drive(session_state)  # Update drive
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
