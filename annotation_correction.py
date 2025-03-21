@@ -462,28 +462,8 @@ def ann_correction(session_state):
         ax.axis('off')
         st.pyplot(fig)
 
-        class_counts = {label: 0 for label in label_list}
-        for label_id in all_labels.values():
-            class_counts[label_list[label_id]] += 1
-
-        do_not_care_label = label_list[-1]
-
-        total_points = sum(count for label, count in class_counts.items() if label != do_not_care_label)
-
-        # Prepare the preview text
-        preview_text = f"**Sample:** {image_file_name}\n\n"
-        preview_text += f"**Total puntos anotados:** {total_points}\n\n"
-        preview_text += "| Clase | Cantidad | Porcentaje |\n"
-        preview_text += "|-------|----------|------------|\n"
-        for label, count in class_counts.items():
-            if label == do_not_care_label:
-                preview_text += "|=======|==========|============|\n"
-                preview_text += f"| **{label}** | {count} | |\n"
-            else:
-                percentage = (count / total_points * 100) if total_points > 0 else 0
-                preview_text += f"| **{label}** | {count} | {percentage:.2f}% |\n"
-
-        st.markdown(preview_text)
+        # Display the annotation report generated in the session state
+        st.text(session_state['report_data'])
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
         # Update points and labels in session state if any changes are made

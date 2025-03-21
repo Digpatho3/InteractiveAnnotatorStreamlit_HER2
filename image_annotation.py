@@ -85,11 +85,11 @@ def update_results(session_state, all_points, all_labels, file_name):
         csv_file.write(csv_data)
 
     # Get the current date and time with timezone -3
-    tz = timezone('Etc/GMT+3')
-    current_datetime = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S %Z%z")
+    tz = timezone('America/Argentina/Cordoba')
+    current_datetime = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S (%Z)")
 
     # **Generate the Annotation Report**
-    category = session_state.get('category', 'HER2/neu')
+    category = next((key for key, value in label_lists.items() if value == label_list), None)
     if category == "Ki67":
         num_positive = labels.count(0)
         num_negative = labels.count(1)
@@ -101,8 +101,8 @@ def update_results(session_state, all_points, all_labels, file_name):
         report_content = f"""
         Reporte de anotación
         ==================
+        Nombre de la imagen: {category}
         Fecha y hora de generación: {current_datetime}
-        Nombre de la imagen: {file_name}
         Número de puntos positivos: {num_positive} - Porcentaje: {100 * num_positive / total:.2f}%
         Número de puntos negativos: {num_negative} - Porcentaje: {100 * num_negative / total:.2f}%
         Cantidad total de elementos: {total}
@@ -113,10 +113,10 @@ def update_results(session_state, all_points, all_labels, file_name):
             total = 1  # Avoid division by zero
 
         report_content = f"""
-        Reporte de anotación HER2
+        Reporte de anotación {category}
         =========================
-        Fecha y hora de generación: {current_datetime}
         Imagen: {file_name}
+        Fecha y hora de generación: {current_datetime}
         ---
         Completa 3+: {labels.count(0)} - Porcentaje: {100 * labels.count(0) / total:.2f}%
         Completa 2+: {labels.count(1)} - Porcentaje: {100 * labels.count(1) / total:.2f}%
@@ -131,11 +131,11 @@ def update_results(session_state, all_points, all_labels, file_name):
         """
     else:
         report_content = f"""
-        Reporte de anotación
+        Reporte de anotación {category}
         ==================
         Fecha y hora de generación: {current_datetime}
         Nombre de la imagen: {file_name}
-        Categoría no definida para el reporte.
+        Categoría {category} no definida para el reporte.
         """
 
     # Create file-like object to download the report
