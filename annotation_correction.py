@@ -94,49 +94,53 @@ def setup_drive(session_state):
 
 
 def load_sample(session_state, selected_sample):
-    # Check if the selected sample is already downloaded
+    # Check if selected sample is alreaded downloaded
     img_path = None
-    ann_file_path = f"{ann_dir}/{selected_sample}.csv"
-
-    # Verify if the image is already downloaded
     for file in os.listdir(image_dir):
         if os.path.splitext(file)[0].strip() == selected_sample.strip():
-            img_path = f"{image_dir}/{file}"
+            img_path = f"{image_dir}/{file}" 
+            ann_file_path  = f"{ann_dir}/{selected_sample}.csv"
             break
+
+    drive = session_state['drive']
+    todo_dict = session_state['todo_dict']
+    toreview_dict = session_state['toreview_dict']
+    done_dict = session_state['done_dict']
+    discarded_dict = session_state['discarded_dict']
 
     # Download the image if it is not present
     if img_path is None:
-        drive = session_state['drive']
-        todo_dict = session_state['todo_dict']
-        toreview_dict = session_state['toreview_dict']
-        done_dict = session_state['done_dict']
 
         if selected_sample in todo_dict.keys():
             img_path = get_gdrive_image_path(drive, todo_dict[selected_sample], image_dir, selected_sample)
+            ann_file_path = f"{ann_dir}/{selected_sample}.csv"
+            if not os.path.exists(ann_file_path):
+                with open(ann_file_path, 'w', encoding='utf-8') as blank_csv:
+                    blank_csv.write("x,y,label\n")  # Create a blank CSV with headers
 
         elif selected_sample in toreview_dict.keys():
             img_path = get_gdrive_image_path(drive, toreview_dict[selected_sample], image_dir, selected_sample)
-
-        elif selected_sample in done_dict.keys():
-            img_path = get_gdrive_image_path(drive, done_dict[selected_sample], image_dir, selected_sample)
-
-    # Verify if the CSV file exists and is not empty
-    if not os.path.exists(ann_file_path) or os.stat(ann_file_path).st_size == 0:
-        drive = session_state['drive']
-        todo_dict = session_state['todo_dict']
-        toreview_dict = session_state['toreview_dict']
-        done_dict = session_state['done_dict']
-
-        if selected_sample in todo_dict.keys():
-            # Create an empty CSV file locally
-            with open(ann_file_path, 'w', encoding='utf-8') as ann_csv:
-                ann_csv.write("X,Y,Label\n")
-
-        elif selected_sample in toreview_dict.keys():
             ann_file_path = get_gdrive_csv_path(drive, toreview_dict[selected_sample], ann_dir, selected_sample)
 
         elif selected_sample in done_dict.keys():
+            img_path = get_gdrive_image_path(drive, done_dict[selected_sample], image_dir, selected_sample)
             ann_file_path = get_gdrive_csv_path(drive, done_dict[selected_sample], ann_dir, selected_sample)
+    
+        elif selected_sample in discarded_dict.keys():
+            img_path = get_gdrive_image_path(drive, discarded_dict[selected_sample], image_dir, selected_sample)
+            ann_file_path = get_gdrive_csv_path(drive, discarded_dict[selected_sample], ann_dir, selected_sample)
+
+    # Verify if ann_file_path exists, otherwise repeat the process
+    if not os.path.exists(ann_file_path):
+        if selected_sample in todo_dict.keys():
+            with open(ann_file_path, 'w', encoding='utf-8') as blank_csv:
+                blank_csv.write("x,y,label\n")  # Create a blank CSV with headers
+        elif selected_sample in toreview_dict.keys():
+            ann_file_path = get_gdrive_csv_path(drive, toreview_dict[selected_sample], ann_dir, selected_sample)
+        elif selected_sample in done_dict.keys():
+            ann_file_path = get_gdrive_csv_path(drive, done_dict[selected_sample], ann_dir, selected_sample)
+        elif selected_sample in discarded_dict.keys():
+            ann_file_path = get_gdrive_csv_path(drive, discarded_dict[selected_sample], ann_dir, selected_sample)
 
     # Process the image and the CSV file
     image_file_name = selected_sample
