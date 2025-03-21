@@ -8,6 +8,8 @@ from PIL import Image, ImageDraw
 import numpy as np
 import pandas as pd
 import os
+from datetime import datetime
+from pytz import timezone
 
 # Folders
 image_dir  = "./images"
@@ -82,23 +84,59 @@ def update_results(session_state, all_points, all_labels, file_name):
     with open(csv_filename, "w", encoding="utf-8") as csv_file:
         csv_file.write(csv_data)
 
+    # Get the current date and time with timezone -3
+    tz = timezone('Etc/GMT+3')
+    current_datetime = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S %Z%z")
+
     # **Generate the Annotation Report**
-    num_positive = labels.count(0)
-    num_negative = labels.count(1)
+    category = session_state.get('category', 'HER2/neu')
+    if category == "Ki67":
+        num_positive = labels.count(0)
+        num_negative = labels.count(1)
+        total = num_positive + num_negative
 
-    total = num_positive + num_negative
+        if total == 0:
+            total = 1  # Avoid division by zero
 
-    if total==0:
-        total = -1
+        report_content = f"""
+        Reporte de anotación
+        ==================
+        Fecha y hora de generación: {current_datetime}
+        Nombre de la imagen: {file_name}
+        Número de puntos positivos: {num_positive} - Porcentaje: {100 * num_positive / total:.2f}%
+        Número de puntos negativos: {num_negative} - Porcentaje: {100 * num_negative / total:.2f}%
+        Cantidad total de elementos: {total}
+        """
+    elif category == "HER2/neu":
+        total = sum(labels.count(i) for i in range(len(label_list)))
+        if total == 0:
+            total = 1  # Avoid division by zero
 
-    report_content = f"""
-    Reporte de anotación
-    ==================
-    Nombre de la imagen: {file_name}
-    Número de puntos positivos: {num_positive} - Porcentaje: {100*num_positive/total}%
-    Número de puntos negativos: {num_negative} - Porcentaje: {100*num_negative/total}%
-    Cantidad total de elementos {total}
-    """
+        report_content = f"""
+        Reporte de anotación HER2
+        =========================
+        Fecha y hora de generación: {current_datetime}
+        Imagen: {file_name}
+        ---
+        Completa 3+: {labels.count(0)} - Porcentaje: {100 * labels.count(0) / total:.2f}%
+        Completa 2+: {labels.count(1)} - Porcentaje: {100 * labels.count(1) / total:.2f}%
+        Completa 1+: {labels.count(2)} - Porcentaje: {100 * labels.count(2) / total:.2f}%
+        Incompleta 2+: {labels.count(3)} - Porcentaje: {100 * labels.count(3) / total:.2f}%
+        Incompleta 1+: {labels.count(4)} - Porcentaje: {100 * labels.count(4) / total:.2f}%
+        Ausente: {labels.count(5)} - Porcentaje: {100 * labels.count(5) / total:.2f}%
+        ---
+        Total: {total}
+        ---
+        No importa: {labels.count(6)}
+        """
+    else:
+        report_content = f"""
+        Reporte de anotación
+        ==================
+        Fecha y hora de generación: {current_datetime}
+        Nombre de la imagen: {file_name}
+        Categoría no definida para el reporte.
+        """
 
     # Create file-like object to download the report
     report_buffer = io.StringIO()
