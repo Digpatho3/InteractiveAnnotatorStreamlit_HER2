@@ -327,7 +327,7 @@ def ann_correction(session_state):
     # Get selected sample based on the chosen category
     selected_sample = None
 
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([3, 1])
 
     with col2:
         sort_option = st.selectbox(
