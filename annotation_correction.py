@@ -257,22 +257,27 @@ def ann_correction(session_state):
         session_state['label'] = st.selectbox("Clase:", label_lists[category])
         session_state['action'] = st.selectbox("Acción:", actions)
 
-    # Add a button to the sidebar
+    # Add a dropdown and a confirm button to the sidebar
     st.sidebar.header("Finalizar")
     with st.sidebar:
-        if st.button(f"{done_symbol} Finalizar anotación"):
-            if 'selected_sample' in session_state:
-                finish_annotation(session_state, session_state['selected_sample'], anns_done_dir)
-                setup_drive(session_state)  # Update drive
+        action = st.selectbox(
+            "Selecciona una acción:",
+            options=[
+                f"{done_symbol} Finalizar anotación",
+                f"{toreview_symbol} Mandar a revisión",
+                f"{discard_symbol} Descartar"
+            ],
+            index=1
+        )
 
-        if st.button(f"{toreview_symbol} Mandar a revisión"):
+        if st.button("Confirmar acción"):
             if 'selected_sample' in session_state:
-                finish_annotation(session_state, session_state['selected_sample'], anns_toreview_dir)
-                setup_drive(session_state)  # Update drive
-
-        if st.button(f"{discard_symbol} Descartar"):
-            if 'selected_sample' in session_state:
-                finish_annotation(session_state, session_state['selected_sample'], anns_discarded_dir)
+                if action == f"{done_symbol} Finalizar anotación":
+                    finish_annotation(session_state, session_state['selected_sample'], anns_done_dir)
+                elif action == f"{toreview_symbol} Mandar a revisión":
+                    finish_annotation(session_state, session_state['selected_sample'], anns_toreview_dir)
+                elif action == f"{discard_symbol} Descartar":
+                    finish_annotation(session_state, session_state['selected_sample'], anns_discarded_dir)
                 setup_drive(session_state)  # Update drive
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
