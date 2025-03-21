@@ -47,8 +47,26 @@ def setup_drive(session_state):
 
      # Store sample names separately
     session_state['todo_samples'] = [f"{sample_name} {todo_symbol}" for sample_name in todo_dict.keys()]
-    session_state['toreview_samples'] = [f"{sample_name} {toreview_symbol}" for sample_name in toreview_dict.keys()]
-    session_state['done_samples'] = [f"{sample_name} {done_symbol}" for sample_name in done_dict.keys()]
+
+    # Add metadata (last editor and last edit time) for toreview and done samples
+    session_state['toreview_samples'] = []
+    for sample_name, file_list in toreview_dict.items():
+        metadata = get_file_metadata(drive, file_list)
+        last_editor = metadata['last_editor']
+        last_modified_date = metadata['last_modified_date']
+        session_state['toreview_samples'].append(
+            f"{sample_name} {toreview_symbol} (Editor: {last_editor}, Fecha: {last_modified_date})"
+        )
+
+    session_state['done_samples'] = []
+    for sample_name, file_list in done_dict.items():
+        metadata = get_file_metadata(drive, file_list)
+        last_editor = metadata['last_editor']
+        last_modified_date = metadata['last_modified_date']
+        session_state['done_samples'].append(
+            f"{sample_name} {done_symbol} (Editor: {last_editor}, Fecha: {last_modified_date})"
+        )
+
 
     # Combine all sample names with their corresponding symbols
     sample_list = {}
@@ -284,7 +302,8 @@ def ann_correction(session_state):
                 session_state['toreview_samples']
             )
             if selected_sample_option:
-                selected_sample = selected_sample_option.rsplit(' ', 1)[0]
+                # Extract the sample name before the metadata
+                selected_sample = selected_sample_option.rsplit(' ')[0]
         else:
             st.warning("No hay muestras para revisar disponibles.")
     elif enabled_dropdown == "OK":
@@ -294,7 +313,8 @@ def ann_correction(session_state):
                 session_state['done_samples']
             )
             if selected_sample_option:
-                selected_sample = selected_sample_option.rsplit(' ', 1)[0]
+                # Extract the sample name before the metadata
+                selected_sample = selected_sample_option.rsplit(' ')[0]
         else:
             st.warning("No hay muestras OK disponibles.")
 

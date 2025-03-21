@@ -1,6 +1,7 @@
 import os
 import json
 from itertools import groupby
+from datetime import datetime, timedelta
 #from io import BytesIO, StringIO
 
 from pydrive2.auth import GoogleAuth
@@ -454,6 +455,53 @@ def upload_file_to_gdrive(drive, file_path, folder_id):
     gfile = drive.CreateFile({'title': file_name, 'parents': [{'id': folder_id}]})
     gfile.SetContentFile(file_path)
     gfile.Upload()
+
+def get_file_metadata(drive, file_list, timezone_offset=-3):
+    """Get metadata (last editor and last modified date) for a file.
+
+    Parameters
+    ----------
+    drive : GoogleDrive
+        Drive as a PyDrive2 ``GoogleDrive`` object.
+    file_list : list of GoogleDriveFile
+        List containing ``GoogleDriveFile`` instances for files that
+        share the same file name.
+    timezone_offset : int, optional
+        Timezone offset in hours from UTC (default is -3 for UTC-3).
+
+    Returns
+    -------
+    metadata : dict
+        Dictionary containing 'last_editor' and 'last_modified_date'.
+    """
+    # Filter file.
+    gfile = next(iter(file_list), None)
+
+    # Check file.
+    if gfile is None:
+        return {"last_editor": "Desconocido", "last_modified_date": "Desconocida"}
+
+    # Fetch metadata.
+    file = drive.CreateFile({'id': gfile['id']})
+    file.FetchMetadata(fields='lastModifyingUser/displayName,modifiedDate')
+
+    # Extract last editor
+    last_editor = file.get('lastModifyingUser', {}).get('displayName', 'Desconocido')
+    if "@" in last_editor:  # If it's an email, take the part before '@'
+        last_editor = last_editor.split("@")[0]
+
+    # Convert last modified date to specified timezone
+    last_modified_date = file.get('modifiedDate', 'Desconocida')
+    if last_modified_date != 'Desconocida':
+        # Parse the date and adjust to the specified timezone
+        utc_time = datetime.strptime(last_modified_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+        adjusted_time = utc_time + timedelta(hours=timezone_offset)
+        last_modified_date = adjusted_time.strftime("%Y-%m-%d %H:%M:%S") + f" UTC{timezone_offset:+}"
+
+    return {
+        "last_editor": last_editor,
+        "last_modified_date": last_modified_date
+    }
 
 if __name__ == '__main__':
     # Path to keys.
