@@ -29,11 +29,11 @@ label_list = label_lists['HER2/neu']
 actions = ['Agregar', 'Borrar']
 
 her2_colors = [
-    "#1976D2",  # Completa 3+ (Azul oscuro)
-    "#64B5F6",  # Completa 2+ (Azul claro)
-    "#BBDEFB",  # Completa 1+ (Azul muy claro/celeste)
-    "#FF9800",  # Incompleta 2+ (Naranja brillante)
-    "#FFE0B2",  # Incompleta 1+ (Naranja pálido)
+    "#FF0000",  # Completa 3+ (Rojo)
+    "#FF00FF",  # Completa 2+ (Fucsia)
+    "#FFA500",  # Completa 1+ (Naranja)
+    "#006400",  # Incompleta 2+ (Verde oscuro)
+    "#00FF00",  # Incompleta 1+ (Verde fluor)
     "#757575",  # Ausente (Gris medio oscuro)
     "#263238"   # No importa (Gris muy oscuro/azul grisáceo)
 ]
