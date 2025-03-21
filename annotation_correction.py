@@ -25,12 +25,13 @@ anns_toreview_dir = 'anotaciones_a_revisar'
 anns_done_dir = 'anotaciones_ok'
 anns_discarded_dir = 'anotaciones_descartadas'
 
-parent_folder_id = '1Y423-t-9GesYP1RwRRmnBnQl8bRYEpAC' # Shared folder
-
 path_to_json_key = "pydrive_credentials.json"
 
 def setup_drive(session_state):
     drive = get_drive(path_to_json_key)
+
+    # (optional) Get parent folder ID from secrets
+    parent_folder_id = st.secrets["google_drive"].get("parent_folder_id", None)
 
     folder_dict, todo_dict, toreview_dict, done_dict, discarded_dict = \
         get_dicts(drive, anns_todo_dir, anns_toreview_dir, anns_done_dir, anns_discarded_dir, parent_folder_id)
