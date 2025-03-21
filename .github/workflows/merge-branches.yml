@@ -1,0 +1,30 @@
+name: Merge to Multiple Branches
+
+on:
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub Actions
+
+jobs:
+  merge-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Asegura que se traigan todas las branches
+
+      - name: Setup Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Merge branches
+        run: |
+            BRANCH_ORIGEN="her2_developer"
+            BRANCHES_DESTINO=($(git branch -r | grep -oP 'her2_\w+' | grep -v 'her2_integration'))  # excepto "her2_integration"
+
+          for BRANCH in "${BRANCHES_DESTINO[@]}"; do
+            echo "Haciendo merge en $BRANCH..."
+            git checkout $BRANCH
+            git merge origin/$BRANCH_ORIGEN --no-edit || { echo "Conflicto en $BRANCH, resolviendo..."; git merge --abort; continue; }
+            git push origin $BRANCH
+          done
