@@ -454,6 +454,17 @@ def ann_correction(session_state):
             zoom=zoom,
             colors=colors, # Pass the colors for the current category, if available
         )
+        
+        # Update points and labels in session state if any changes are made
+        if new_labels is not None:
+
+            # Incorporate the new labels
+            all_points, all_labels = update_annotations(new_labels, all_points, all_labels, session_state)
+
+            # Update results
+            base_name = os.path.splitext(image_file_name)[0]
+            update_results(session_state, all_points, all_labels, base_name)
+            # update_ann_image(session_state, all_points, all_labels, image)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         st.subheader("Vista previa de las clases anotadas")
@@ -479,17 +490,6 @@ def ann_correction(session_state):
         # Display the annotation report generated in the session state
         st.text(session_state['report_data'])
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        
-        # Update points and labels in session state if any changes are made
-        if new_labels is not None:
-
-            # Incorporate the new labels
-            all_points, all_labels = update_annotations(new_labels, all_points, all_labels, session_state)
-
-            # Update results
-            base_name = os.path.splitext(image_file_name)[0]
-            update_results(session_state, all_points, all_labels, base_name)
-            # update_ann_image(session_state, all_points, all_labels, image)
 
 
     # Download results
