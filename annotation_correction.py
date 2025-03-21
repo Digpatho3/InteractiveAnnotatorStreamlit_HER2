@@ -257,28 +257,37 @@ def ann_correction(session_state):
         session_state['label'] = st.selectbox("Clase:", label_lists[category])
         session_state['action'] = st.selectbox("Acción:", actions)
 
-    # Add a dropdown and a confirm button to the sidebar
+    # Add a form to the sidebar for finalizing actions
     st.sidebar.header("Finalizar")
     with st.sidebar:
-        action = st.selectbox(
-            "Selecciona una acción:",
-            options=[
-                f"{done_symbol} Finalizar anotación",
-                f"{toreview_symbol} Mandar a revisión",
-                f"{discard_symbol} Descartar"
-            ],
-            index=1
-        )
+        with st.form("finalize_form", clear_on_submit=True):
+            action = st.selectbox(
+                "Selecciona una acción:",
+                options=[
+                    "---",
+                    f"{done_symbol} Finalizar anotación",
+                    f"{toreview_symbol} Mandar a revisión",
+                    f"{discard_symbol} Descartar"
+                ],
+                index=0
+            )
 
-        if st.button("Confirmar acción"):
-            if 'selected_sample' in session_state:
-                if action == f"{done_symbol} Finalizar anotación":
-                    finish_annotation(session_state, session_state['selected_sample'], anns_done_dir)
-                elif action == f"{toreview_symbol} Mandar a revisión":
-                    finish_annotation(session_state, session_state['selected_sample'], anns_toreview_dir)
-                elif action == f"{discard_symbol} Descartar":
-                    finish_annotation(session_state, session_state['selected_sample'], anns_discarded_dir)
-                setup_drive(session_state)  # Update drive
+            # Every form must have a submit button
+            submitted = st.form_submit_button("Confirmar acción")
+            if submitted:
+                if action == "---":
+                    st.warning("Por favor, selecciona una acción válida antes de confirmar.")
+                elif 'selected_sample' in session_state:
+                    if action == f"{done_symbol} Finalizar anotación":
+                        finish_annotation(session_state, session_state['selected_sample'], anns_done_dir)
+                        st.success(f"Anotación finalizada para '{session_state['selected_sample']}'.")
+                    elif action == f"{toreview_symbol} Mandar a revisión":
+                        finish_annotation(session_state, session_state['selected_sample'], anns_toreview_dir)
+                        st.success(f"Muestra '{session_state['selected_sample']}' enviada a revisión.")
+                    elif action == f"{discard_symbol} Descartar":
+                        finish_annotation(session_state, session_state['selected_sample'], anns_discarded_dir)
+                        st.success(f"Muestra '{session_state['selected_sample']}' descartada.")
+                    setup_drive(session_state)  # Update drive
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Get selected sample based on the chosen category
