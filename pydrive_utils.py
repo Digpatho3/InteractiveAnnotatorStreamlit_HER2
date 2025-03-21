@@ -39,7 +39,7 @@ def get_drive(path_to_json):
     # Return drive.
     return drive
 
-def get_dicts(drive, todo_name, toreview_name, done_name, discarded_name, parent_folder_id=None, timezone_offset=-3):
+def get_dicts(drive, todo_name, toreview_name, done_name, discarded_name, parent_folder_id=None):
     """Get dictionaries for to-do, to-review, done, and discarded files with metadata.
 
     Parameters
@@ -56,8 +56,6 @@ def get_dicts(drive, todo_name, toreview_name, done_name, discarded_name, parent
         Name of the discarded folder.
     parent_folder_id : str, optional
         ID of the parent folder to search within (default is None).
-    timezone_offset : int, optional
-        Timezone offset in hours from UTC (default is -3 for UTC-3).
 
     Returns
     -------
@@ -88,13 +86,6 @@ def get_dicts(drive, todo_name, toreview_name, done_name, discarded_name, parent
         # Group files by their base name (without extension)
         grouped_files = {}
         for file in file_list:
-            # Adjust modifiedDate to the specified timezone
-            modified_date = file.get('modifiedDate', None)
-            if modified_date:
-                utc_time = datetime.strptime(modified_date, "%Y-%m-%dT%H:%M:%S.%fZ")
-                adjusted_time = utc_time + timedelta(hours=timezone_offset)
-                file['modifiedDate'] = adjusted_time.strftime("%Y-%m-%d %H:%M:%S")
-
             base_name = os.path.splitext(file['title'])[0]
             if base_name not in grouped_files:
                 grouped_files[base_name] = []
@@ -497,53 +488,6 @@ def upload_file_to_gdrive(drive, file_path, folder_id):
     gfile = drive.CreateFile({'title': file_name, 'parents': [{'id': folder_id}]})
     gfile.SetContentFile(file_path)
     gfile.Upload()
-
-def get_file_metadata(drive, file_list, timezone_offset=-3):
-    """Get metadata (last editor and last modified date) for a file.
-
-    Parameters
-    ----------
-    drive : GoogleDrive
-        Drive as a PyDrive2 ``GoogleDrive`` object.
-    file_list : list of GoogleDriveFile
-        List containing ``GoogleDriveFile`` instances for files that
-        share the same file name.
-    timezone_offset : int, optional
-        Timezone offset in hours from UTC (default is -3 for UTC-3).
-
-    Returns
-    -------
-    metadata : dict
-        Dictionary containing 'last_editor' and 'last_modified_date'.
-    """
-    # Filter file.
-    gfile = next(iter(file_list), None)
-
-    # Check file.
-    if gfile is None:
-        return {"last_editor": "Desconocido", "last_modified_date": "Desconocida"}
-
-    # Fetch metadata.
-    file = drive.CreateFile({'id': gfile['id']})
-    file.FetchMetadata(fields='lastModifyingUser/displayName,modifiedDate')
-
-    # Extract last editor
-    last_editor = file.get('lastModifyingUser', {}).get('displayName', 'Desconocido')
-    if "@" in last_editor:  # If it's an email, take the part before '@'
-        last_editor = last_editor.split("@")[0]
-
-    # Convert last modified date to specified timezone
-    last_modified_date = file.get('modifiedDate', 'Desconocida')
-    if last_modified_date != 'Desconocida':
-        # Parse the date and adjust to the specified timezone
-        utc_time = datetime.strptime(last_modified_date, "%Y-%m-%dT%H:%M:%S.%fZ")
-        adjusted_time = utc_time + timedelta(hours=timezone_offset)
-        last_modified_date = adjusted_time.strftime("%Y-%m-%d %H:%M:%S") + f" UTC{timezone_offset:+}"
-
-    return {
-        "last_editor": last_editor,
-        "last_modified_date": last_modified_date
-    }
 
 if __name__ == '__main__':
     # Path to keys.

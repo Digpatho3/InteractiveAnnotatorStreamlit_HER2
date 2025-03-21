@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 from image_annotation import *
 from pydrive_utils import *
+from datetime import datetime, timedelta
 
 todo_symbol = '(⬜️)'
 toreview_symbol = '(👀)'
@@ -44,6 +45,7 @@ def setup_drive(session_state):
     session_state['folder_dict'] = folder_dict
 
     def add_metadata_to_samples(sample_dict, symbol):
+
         samples = []
         for sample_name, file_list in sample_dict.items():
             # Extract metadata from the first file in the list
@@ -52,6 +54,18 @@ def setup_drive(session_state):
             if "@" in last_editor:  # If it's an email, take the part before '@'
                 last_editor = last_editor.split("@")[0]
             last_modified_date = first_file.get('modifiedDate', 'Desconocida')
+            
+            # Adjust timezone to -3 if the date is not 'Desconocida'
+            if last_modified_date != 'Desconocida':
+                try:
+                    # Parse the date and adjust timezone
+                    gmt_date = datetime.strptime(last_modified_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+                    adjusted_date = gmt_date - timedelta(hours=3)
+                    last_modified_date = adjusted_date.strftime("%Y-%m-%d %H:%M:%S") + " (-03)"
+                except ValueError:
+                    # Handle unexpected date format
+                    last_modified_date += " (-03)"
+            
             samples.append(
                 f"{sample_name} {symbol} (Editor: {last_editor}, Fecha: {last_modified_date})"
             )
