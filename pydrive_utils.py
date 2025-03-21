@@ -39,8 +39,31 @@ def get_drive(path_to_json):
     # Return drive.
     return drive
 
-def get_dicts(drive, todo_name, toreview_name, done_name, discarded_name, parent_folder_id=None):
-    """Get dictionaries for to-do, to-review, done, and discarded files with metadata."""
+def get_dicts(drive, todo_name, toreview_name, done_name, discarded_name, parent_folder_id=None, timezone_offset=-3):
+    """Get dictionaries for to-do, to-review, done, and discarded files with metadata.
+
+    Parameters
+    ----------
+    drive : GoogleDrive
+        Drive as a PyDrive2 ``GoogleDrive`` object.
+    todo_name : str
+        Name of the to-do folder.
+    toreview_name : str
+        Name of the to-review folder.
+    done_name : str
+        Name of the done folder.
+    discarded_name : str
+        Name of the discarded folder.
+    parent_folder_id : str, optional
+        ID of the parent folder to search within (default is None).
+    timezone_offset : int, optional
+        Timezone offset in hours from UTC (default is -3 for UTC-3).
+
+    Returns
+    -------
+    tuple
+        A tuple containing folder_dict, todo_dict, toreview_dict, done_dict, discarded_dict.
+    """
     # Query to find folders
     query = f"trashed=false and mimeType='application/vnd.google-apps.folder'"
     if parent_folder_id:
@@ -65,12 +88,20 @@ def get_dicts(drive, todo_name, toreview_name, done_name, discarded_name, parent
         # Group files by their base name (without extension)
         grouped_files = {}
         for file in file_list:
+            # Adjust modifiedDate to the specified timezone
+            modified_date = file.get('modifiedDate', None)
+            if modified_date:
+                utc_time = datetime.strptime(modified_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+                adjusted_time = utc_time + timedelta(hours=timezone_offset)
+                file['modifiedDate'] = adjusted_time.strftime("%Y-%m-%d %H:%M:%S")
+
             base_name = os.path.splitext(file['title'])[0]
             if base_name not in grouped_files:
                 grouped_files[base_name] = []
             grouped_files[base_name].append(file)
 
-        return grouped_files
+        # Sort the dictionary by file name (key) alphabetically
+        return dict(sorted(grouped_files.items()))
 
     todo_dict = create_dict(folder_dict[todo_name]['id'])
     toreview_dict = create_dict(folder_dict[toreview_name]['id'])
