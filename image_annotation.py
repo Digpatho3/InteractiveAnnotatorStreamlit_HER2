@@ -26,6 +26,21 @@ label_list = label_lists['HER2/neu']
 
 actions = ['Agregar', 'Borrar']
 
+her2_colors = [
+    "#1976D2",  # Completa 3+ (Azul oscuro)
+    "#64B5F6",  # Completa 2+ (Azul claro)
+    "#BBDEFB",  # Completa 1+ (Azul muy claro/celeste)
+    "#FF9800",  # Incompleta 2+ (Naranja brillante)
+    "#FFE0B2",  # Incompleta 1+ (Naranja pálido)
+    "#757575",  # Ausente (Gris medio oscuro)
+    "#263238"   # No importa (Gris muy oscuro/azul grisáceo)
+]
+
+# mapping for colors based on the category
+category_colors = {
+    'HER2/neu': her2_colors,
+}
+
 def init_session(session_state):
 
     session_state['all_points'] = set()  # Set to track unique point

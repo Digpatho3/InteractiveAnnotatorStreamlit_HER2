@@ -378,6 +378,9 @@ def ann_correction(session_state):
 
         update_patch_data(session_state, all_points, all_labels)
 
+        # colors for the current category
+        colors = category_colors.get(category, None)
+
         # Use pointdet to annotate the image
         new_labels = pointdet(
             image=session_state['resized_image'],
@@ -393,6 +396,7 @@ def ann_correction(session_state):
             label = session_state['label'],
             point_width=5*point_vis,
             zoom=zoom,
+            colors=colors, # Pass the colors for the current category, if available
         )
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -400,8 +404,13 @@ def ann_correction(session_state):
 
         # Crear el gráfico de vista previa
         fig, ax = plt.subplots(figsize=(10, 1))
-        label_colors = get_colormap(label_list)
 
+        # Use custom colors if available
+        if colors:
+            label_colors = {label: color for label, color in zip(label_list, colors)}
+        else:
+            label_colors = get_colormap(label_list)
+  
         for i, label in enumerate(label_list):
             ax.scatter(i, 0, color=label_colors[label], s=50)
             ax.text(i, -0.1, label, ha='center', va='top', fontsize=7)
