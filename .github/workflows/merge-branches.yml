@@ -20,7 +20,7 @@ jobs:
       - name: Merge branches
         run: |
           BRANCH_ORIGEN="her2_developer"
-          BRANCHES_DESTINO=($(git branch -r | grep -oP 'her2_\w+' | grep -v 'her2_integration'))  # excepto "her2_integration"
+            BRANCHES_DESTINO=($(git branch -r | grep -oP 'her2_\w+' | grep -v 'her2_integration' | grep -v 'her2_developer'))  # excepto "her2_integration" y "her2_developer"
 
           for BRANCH in "${BRANCHES_DESTINO[@]}"; do
             echo "Haciendo merge en $BRANCH..."
