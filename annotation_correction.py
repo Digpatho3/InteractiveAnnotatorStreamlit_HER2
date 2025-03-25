@@ -94,51 +94,55 @@ def setup_drive(session_state):
 
 
 def load_sample(session_state, selected_sample):
-    # Check if selected sample is alreaded downloaded
+    # Check if the selected sample is already downloaded
     img_path = None
+    ann_file_path = f"{ann_dir}/{selected_sample}.csv"
+
+    # Verify if the image is already downloaded
     for file in os.listdir(image_dir):
         if os.path.splitext(file)[0].strip() == selected_sample.strip():
-            img_path = f"{image_dir}/{file}" 
-            ann_file_path  = f"{ann_dir}/{selected_sample}.csv"
+            img_path = f"{image_dir}/{file}"
             break
-
-    drive = session_state['drive']
-    todo_dict = session_state['todo_dict']
-    toreview_dict = session_state['toreview_dict']
-    done_dict = session_state['done_dict']
-    discarded_dict = session_state['discarded_dict']
 
     # Download the image if it is not present
     if img_path is None:
+        drive = session_state['drive']
+        todo_dict = session_state['todo_dict']
+        toreview_dict = session_state['toreview_dict']
+        done_dict = session_state['done_dict']
+        discarded_dict = session_state['discarded_dict']
 
         if selected_sample in todo_dict.keys():
             img_path = get_gdrive_image_path(drive, todo_dict[selected_sample], image_dir, selected_sample)
-            ann_file_path = f"{ann_dir}/{selected_sample}.csv"
-            if not os.path.exists(ann_file_path):
-                with open(ann_file_path, 'w', encoding='utf-8') as blank_csv:
-                    blank_csv.write("x,y,label\n")  # Create a blank CSV with headers
 
         elif selected_sample in toreview_dict.keys():
             img_path = get_gdrive_image_path(drive, toreview_dict[selected_sample], image_dir, selected_sample)
-            ann_file_path = get_gdrive_csv_path(drive, toreview_dict[selected_sample], ann_dir, selected_sample)
 
         elif selected_sample in done_dict.keys():
             img_path = get_gdrive_image_path(drive, done_dict[selected_sample], image_dir, selected_sample)
-            ann_file_path = get_gdrive_csv_path(drive, done_dict[selected_sample], ann_dir, selected_sample)
-    
+
         elif selected_sample in discarded_dict.keys():
             img_path = get_gdrive_image_path(drive, discarded_dict[selected_sample], image_dir, selected_sample)
-            ann_file_path = get_gdrive_csv_path(drive, discarded_dict[selected_sample], ann_dir, selected_sample)
 
-    # Verify if ann_file_path exists, otherwise repeat the process
-    if not os.path.exists(ann_file_path):
+    # Verify if the CSV file exists and is not empty
+    if not os.path.exists(ann_file_path) or os.stat(ann_file_path).st_size == 0:
+        drive = session_state['drive']
+        todo_dict = session_state['todo_dict']
+        toreview_dict = session_state['toreview_dict']
+        done_dict = session_state['done_dict']
+        discarded_dict = session_state['discarded_dict']
+
         if selected_sample in todo_dict.keys():
-            with open(ann_file_path, 'w', encoding='utf-8') as blank_csv:
-                blank_csv.write("x,y,label\n")  # Create a blank CSV with headers
+            # Create an empty CSV file locally
+            with open(ann_file_path, 'w', encoding='utf-8') as ann_csv:
+                ann_csv.write("X,Y,Label\n")
+
         elif selected_sample in toreview_dict.keys():
             ann_file_path = get_gdrive_csv_path(drive, toreview_dict[selected_sample], ann_dir, selected_sample)
+
         elif selected_sample in done_dict.keys():
             ann_file_path = get_gdrive_csv_path(drive, done_dict[selected_sample], ann_dir, selected_sample)
+        
         elif selected_sample in discarded_dict.keys():
             ann_file_path = get_gdrive_csv_path(drive, discarded_dict[selected_sample], ann_dir, selected_sample)
 
@@ -166,65 +170,60 @@ def load_sample(session_state, selected_sample):
     # This must be done last
     session_state['load_succesful'] = True
 
-def finish_annotation(session_state, selected_sample, target_dir, delete_csv=False):
+def finish_annotation(session_state, selected_sample, target_dir):
     drive = session_state['drive']
+    todo_dict = session_state['todo_dict']
+    toreview_dict = session_state['toreview_dict']
+    done_dict = session_state['done_dict']
+    discarded_dict = session_state['discarded_dict']
     folder_dict = session_state['folder_dict']
+
     target_folder_id = folder_dict[target_dir]['id']
 
-    # Helper function to update and move files
-    def update_and_move_files(file_list, update_csv=True):
-        if update_csv:
-            # Process points and labels
-            x_coords, y_coords, labels = zip(*[
-                (point[0], point[1], label_list[session_state['all_labels'][point]])
-                for point in session_state['all_points']
-            ])
+    if selected_sample in todo_dict.keys():
+        # Caso: La imagen proviene de todo_dir
+        file_list = todo_dict[selected_sample]
 
-            # Update the CSV file in Google Drive
-            update_gdrive_csv(drive, file_list, x_coords, y_coords, labels)
+        # Subir el archivo CSV local al directorio de destino
+        csv_path = f"{ann_dir}/{selected_sample}.csv"
+        upload_file_to_gdrive(drive, csv_path, target_folder_id)
 
-        # Move the files to the target directory
+        # Mover la imagen al directorio de destino
         for file in file_list:
             move_file(drive, file['id'], target_folder_id)
 
-    # Determine the source directory and process accordingly
-    source_dicts = {
-        'todo_dict': session_state['todo_dict'],
-        'toreview_dict': session_state['toreview_dict'],
-        'done_dict': session_state['done_dict'],
-        'discarded_dict': session_state['discarded_dict']
-    }
+    elif selected_sample in toreview_dict.keys() or \
+         selected_sample in done_dict.keys() or \
+         selected_sample in discarded_dict.keys():
+        # Caso: La imagen proviene de toreview_dir, done_dir o discarded_dir
+        if selected_sample in toreview_dict.keys():
+            file_list = toreview_dict[selected_sample]
+        elif selected_sample in done_dict.keys():
+            file_list = done_dict[selected_sample]
+        elif selected_sample in discarded_dict.keys():
+            file_list = discarded_dict[selected_sample]
 
-    for source_name, source_dict in source_dicts.items():
-        if selected_sample in source_dict:
-            file_list = source_dict[selected_sample]
+        # Actualizar el archivo CSV en su ubicación actual
+        x_coords = []
+        y_coords = []
+        labels = []
+        for point in session_state['all_points']:
+            x_coords.append(point[0])
+            y_coords.append(point[1])
+            label_int = session_state['all_labels'][point]
+            labels.append(label_list[label_int])
 
-            # Handle the new action: Delete CSV and move to "todo"
-            if delete_csv:
-                # Delete the CSV file in Google Drive
-                for file in file_list:
-                    if file['mimeType'] == 'text/csv':
-                        drive.CreateFile({'id': file['id']}).Delete()
+        update_gdrive_csv(drive, file_list, x_coords, y_coords, labels)
 
-                # Move the image to the target directory
-                for file in file_list:
-                    if file['mimeType'].startswith('image/'):
-                        move_file(drive, file['id'], target_folder_id)
+        # Mover el archivo CSV al directorio de destino
+        for file in file_list:
+            if file['title'].endswith('.csv'):
+                move_file(drive, file['id'], target_folder_id)
 
-                return
-
-            # Handle transitions from 'todo_dict'
-            if source_name == 'todo_dict':
-                if target_dir in [anns_toreview_dir, anns_done_dir]:
-                    if not session_state['all_points']:
-                        st.warning(f"No hay puntos anotados para el sample '{selected_sample}'.")
-                        return
-                elif target_dir == anns_discarded_dir:
-                    csv_path = f"{ann_dir}/{selected_sample}.csv"
-                    upload_file_to_gdrive(drive, csv_path, target_folder_id)
-
-            # No point verification needed for 'toreview_dict' or 'done_dict'
-            update_and_move_files(file_list, update_csv=(source_name != 'todo_dict'))
+        # Mover la imagen al directorio de destino
+        for file in file_list:
+            if not file['title'].endswith('.csv'):
+                move_file(drive, file['id'], target_folder_id)
 
 def ann_correction(session_state):
 
@@ -292,18 +291,16 @@ def ann_correction(session_state):
                 "Selecciona una acción:",
                 options=[
                     "---",
-                    f"{done_symbol} Finalizar anotación",
                     f"{toreview_symbol} Mandar a revisión",
-                    f"{discard_symbol} Descartar",
-                    f"{todo_symbol} Reiniciar"
+                    f"{done_symbol} Finalizar anotación",
+                    f"{discard_symbol} Descartar"
                 ],
                 index=0,
                 help=(
                     "Selecciona una acción para la muestra actual:\n"
-                    f"- {done_symbol} Finalizar anotación: Mueve la muestra a 'OK'.\n"
                     f"- {toreview_symbol} Mandar a revisión: Mueve la muestra a 'Revisar'.\n"
-                    f"- {discard_symbol} Descartar: Mueve la muestra a 'Descartado'.\n"
-                    f"- {todo_symbol} Reiniciar: Borra las anotaciones y mueve la muestra a 'Sin anotar'."
+                    f"- {done_symbol} Finalizar anotación: Mueve la muestra a 'OK'.\n"
+                    f"- {discard_symbol} Descartar: Mueve la muestra a 'Descartado'."
                 )
             )
 
@@ -313,18 +310,15 @@ def ann_correction(session_state):
                 if action == "---":
                     st.warning("Por favor, selecciona una acción válida antes de confirmar.")
                 elif 'selected_sample' in session_state:
-                    if action == f"{done_symbol} Finalizar anotación":
-                        finish_annotation(session_state, session_state['selected_sample'], anns_done_dir)
-                        st.success(f"Anotación finalizada para '{session_state['selected_sample']}'.")
-                    elif action == f"{toreview_symbol} Mandar a revisión":
+                    if action == f"{toreview_symbol} Mandar a revisión":
                         finish_annotation(session_state, session_state['selected_sample'], anns_toreview_dir)
                         st.success(f"Muestra '{session_state['selected_sample']}' enviada a revisión.")
+                    elif action == f"{done_symbol} Finalizar anotación":
+                        finish_annotation(session_state, session_state['selected_sample'], anns_done_dir)
+                        st.success(f"Anotación finalizada para '{session_state['selected_sample']}'.")
                     elif action == f"{discard_symbol} Descartar":
                         finish_annotation(session_state, session_state['selected_sample'], anns_discarded_dir)
                         st.success(f"Muestra '{session_state['selected_sample']}' descartada.")
-                    elif action == f"{todo_symbol} Reiniciar":
-                        finish_annotation(session_state, session_state['selected_sample'], anns_todo_dir, delete_csv=True)
-                        st.success(f"Datos borrados y muestra '{session_state['selected_sample']}' movida a 'Sin anotar'.")
                     setup_drive(session_state)  # Update drive
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
