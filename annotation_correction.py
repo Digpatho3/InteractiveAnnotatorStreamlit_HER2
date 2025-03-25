@@ -325,7 +325,7 @@ def ann_correction(session_state):
     # Get selected sample based on the chosen category
     selected_sample = None
 
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3, col4 = st.columns([5, 2, 1, 1])
 
     with col2:
         sort_option = st.selectbox(
@@ -363,7 +363,40 @@ def ann_correction(session_state):
             sample_key, label = sample_dict[enabled_dropdown]
             samples = session_state.get(sample_key, [])
             if samples:
-                sorted_samples = sort_samples(samples, sort_option)
+                # Extract numeric parts of sample names for filtering
+                sample_numbers = [
+                    int(s.split('_')[-1].split(' ')[0]) for s in samples
+                ]
+                min_sample = min(sample_numbers)
+                max_sample = max(sample_numbers)
+
+                # Add range filter
+                with col3:
+                    min_filter = st.number_input(
+                        "N° mínimo", 
+                        min_value=min_sample, 
+                        max_value=max_sample, 
+                        value=min_sample, 
+                        step=1,
+                        help="Establece el menor N° de muestra a mostrar."
+                    )
+                with col4:
+                    max_filter = st.number_input(
+                        "N° máximo", 
+                        min_value=min_sample, 
+                        max_value=max_sample, 
+                        value=max_sample, 
+                        step=1,
+                        help="Establece el mayor N° de muestra a mostrar."
+                    )
+
+                # Filter samples based on range
+                filtered_samples = [
+                    s for s in samples 
+                    if min_filter <= int(s.split('_')[-1].split(' ')[0]) <= max_filter
+                ]
+
+                sorted_samples = sort_samples(filtered_samples, sort_option)
                 selected_sample_option = st.selectbox(
                     f"{label} ({len(sorted_samples)}):", 
                     sorted_samples
