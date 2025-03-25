@@ -96,6 +96,8 @@ def setup_drive(session_state):
     session_state['display_samples'] = list(sample_list.keys())
     session_state['sample_names'] = list(sample_list.values())
 
+    return 1
+
 
 def load_sample(session_state, selected_sample):
     # Check if the selected sample is already downloaded
