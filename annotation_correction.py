@@ -29,7 +29,11 @@ anns_discarded_dir = 'anotaciones_descartadas'
 path_to_json_key = "pydrive_credentials.json"
 
 def setup_drive(session_state):
-    drive = get_drive(path_to_json_key)
+    try:
+        drive = get_drive(path_to_json_key)
+    except Exception:
+        st.error("⚠️ Hubo un problema al inicializar la conexión con Google Drive. Notifica al administrador.")
+        return -1
 
     # (optional) Get parent folder ID from secrets
     parent_folder_id = st.secrets["google_drive"].get("parent_folder_id", None)
@@ -112,17 +116,22 @@ def load_sample(session_state, selected_sample):
         done_dict = session_state['done_dict']
         discarded_dict = session_state['discarded_dict']
 
-        if selected_sample in todo_dict.keys():
-            img_path = get_gdrive_image_path(drive, todo_dict[selected_sample], image_dir, selected_sample)
+        try:
+            if selected_sample in todo_dict.keys():
+                img_path = get_gdrive_image_path(drive, todo_dict[selected_sample], image_dir, selected_sample)
 
-        elif selected_sample in toreview_dict.keys():
-            img_path = get_gdrive_image_path(drive, toreview_dict[selected_sample], image_dir, selected_sample)
+            elif selected_sample in toreview_dict.keys():
+                img_path = get_gdrive_image_path(drive, toreview_dict[selected_sample], image_dir, selected_sample)
 
-        elif selected_sample in done_dict.keys():
-            img_path = get_gdrive_image_path(drive, done_dict[selected_sample], image_dir, selected_sample)
+            elif selected_sample in done_dict.keys():
+                img_path = get_gdrive_image_path(drive, done_dict[selected_sample], image_dir, selected_sample)
 
-        elif selected_sample in discarded_dict.keys():
-            img_path = get_gdrive_image_path(drive, discarded_dict[selected_sample], image_dir, selected_sample)
+            elif selected_sample in discarded_dict.keys():
+                img_path = get_gdrive_image_path(drive, discarded_dict[selected_sample], image_dir, selected_sample)
+
+        except Exception:
+            st.error(f"⚠️ Hubo un problema al descargar la imagen para el sample '{selected_sample}'. Notifica al administrador.")
+            return -1
 
     # Verify if the CSV file exists and is not empty
     if not os.path.exists(ann_file_path) or os.stat(ann_file_path).st_size == 0:
@@ -132,19 +141,24 @@ def load_sample(session_state, selected_sample):
         done_dict = session_state['done_dict']
         discarded_dict = session_state['discarded_dict']
 
-        if selected_sample in todo_dict.keys():
-            # Create an empty CSV file locally
-            with open(ann_file_path, 'w', encoding='utf-8') as ann_csv:
-                ann_csv.write("X,Y,Label\n")
+        try:
+            if selected_sample in todo_dict.keys():
+                # Create an empty CSV file locally
+                with open(ann_file_path, 'w', encoding='utf-8') as ann_csv:
+                    ann_csv.write("X,Y,Label\n")
 
-        elif selected_sample in toreview_dict.keys():
-            ann_file_path = get_gdrive_csv_path(drive, toreview_dict[selected_sample], ann_dir, selected_sample)
+            elif selected_sample in toreview_dict.keys():
+                ann_file_path = get_gdrive_csv_path(drive, toreview_dict[selected_sample], ann_dir, selected_sample)
 
-        elif selected_sample in done_dict.keys():
-            ann_file_path = get_gdrive_csv_path(drive, done_dict[selected_sample], ann_dir, selected_sample)
-        
-        elif selected_sample in discarded_dict.keys():
-            ann_file_path = get_gdrive_csv_path(drive, discarded_dict[selected_sample], ann_dir, selected_sample)
+            elif selected_sample in done_dict.keys():
+                ann_file_path = get_gdrive_csv_path(drive, done_dict[selected_sample], ann_dir, selected_sample)
+
+            elif selected_sample in discarded_dict.keys():
+                ann_file_path = get_gdrive_csv_path(drive, discarded_dict[selected_sample], ann_dir, selected_sample)
+
+        except Exception:
+            st.error(f"⚠️ Hubo un problema al descargar el archivo CSV para el sample '{selected_sample}'. Notifica al administrador.")
+            return -1
 
     # Process the image and the CSV file
     image_file_name = selected_sample
@@ -156,8 +170,12 @@ def load_sample(session_state, selected_sample):
     session_state['height'] = int(scale * height)
     session_state['scale'] = scale
 
-    with open(ann_file_path, 'r', encoding='utf-8') as ann_csv:
-        annotations = ann_csv.read()
+    try:
+        with open(ann_file_path, 'r', encoding='utf-8') as ann_csv:
+            annotations = ann_csv.read()
+    except Exception:
+        st.error(f"⚠️ Hubo un problema al leer el archivo CSV '{ann_file_path}'. Notifica al administrador.")
+        return -1
 
     session_state['image_file_name'] = image_file_name
     session_state['img_path'] = img_path
@@ -169,6 +187,7 @@ def load_sample(session_state, selected_sample):
 
     # This must be done last
     session_state['load_succesful'] = True
+    return 1
 
 def finish_annotation(session_state, selected_sample, target_dir):
     drive = session_state['drive']
@@ -247,7 +266,9 @@ def ann_correction(session_state):
             json.dump(json_contents, json_file, indent=4)  # Pretty formatting
 
         init_session(session_state)
-        setup_drive(session_state)
+        if setup_drive(session_state) < 0:
+            return
+        
 
     st.sidebar.header("Visualización")
     with st.sidebar:
@@ -432,7 +453,8 @@ def ann_correction(session_state):
     # We check if the last load was succesful
     if 'load_succesful' not in session_state or \
         session_state['load_succesful'] != True:
-        load_sample(session_state, selected_sample)
+        if load_sample(session_state, selected_sample) < 0:
+            return
 
     if 'image_file_name' in session_state:
         image_file_name  = session_state['image_file_name']
