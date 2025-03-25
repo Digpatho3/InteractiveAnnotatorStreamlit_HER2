@@ -293,14 +293,28 @@ def ann_correction(session_state):
         # Hardcode the category to 'HER2/neu' and disable the selectbox
         category = 'HER2/neu'
         st.selectbox("Marcador:", [category], index=0, disabled=True)  # Disabled selectbox
+
+        # Calculate the number of samples in each state
+        todo_count = len(session_state.get('todo_samples', []))
+        toreview_count = len(session_state.get('toreview_samples', []))
+        done_count = len(session_state.get('done_samples', []))
+        discarded_count = len(session_state.get('discarded_samples', []))
+
+        # Update the state options to include the counts
+        state_options = [
+            f"{todo_symbol} {states[0]} ({todo_count})",
+            f"{toreview_symbol} {states[1]} ({toreview_count})",
+            f"{done_symbol} {states[2]} ({done_count})",
+            f"{discard_symbol} {states[3]} ({discarded_count})"
+        ]
+
+        # Display the selectbox with the updated options
         enabled_dropdown = st.selectbox(
             "Estado:", 
-            [f"{todo_symbol} {states[0]}", 
-             f"{toreview_symbol} {states[1]}", 
-             f"{done_symbol} {states[2]}", 
-             f"{discard_symbol} {states[3]}"], 
+            state_options, 
             index=0
-        ).split(' ', 1)[1]
+        ).split(' ', 1)[1].rsplit(' ', 1)[0]  # Extract the state name without the count
+
         session_state['label'] = st.selectbox("Clase:", label_lists[category])
         session_state['action'] = st.selectbox("Acción:", actions)
 
@@ -346,31 +360,7 @@ def ann_correction(session_state):
     # Get selected sample based on the chosen category
     selected_sample = None
 
-    col1, col2, col3, col4 = st.columns([5, 2, 1, 1])
-
-    with col2:
-        sort_option = st.selectbox(
-            "Ordenamiento:",
-            options=["00000 ➡️ 99999",
-                     "99999 ➡️ 00000", 
-                     "Recientes primero", 
-                     "Antiguos primero", 
-                     "Editor"],
-            index=0
-        )
-
-    def sort_samples(samples, sort_by):
-        if sort_by == "00000 ➡️ 99999":
-            return sorted(samples, key=lambda x: x.rsplit(' ', 1)[0])
-        elif sort_by == "99999 ➡️ 00000":
-            return sorted(samples, key=lambda x: x.rsplit(' ', 1)[0], reverse=True)
-        elif sort_by == "Recientes primero":
-            return sorted(samples, key=lambda x: x.split("Fecha: ")[-1].strip(), reverse=True)
-        elif sort_by == "Antiguos primero":
-            return sorted(samples, key=lambda x: x.split("Fecha: ")[-1].strip())
-        elif sort_by == "Editor":
-            return sorted(samples, key=lambda x: x.split("Editor: ")[-1].split(",")[0].strip())
-        return samples
+    col1, col2, col3, col4 = st.columns([6, 2, 1, 1])
 
     sample_dict = {
         "Sin anotar": ("todo_samples", "Muestras sin anotar"),
@@ -390,6 +380,37 @@ def ann_correction(session_state):
                 ]
                 min_sample = min(sample_numbers)
                 max_sample = max(sample_numbers)
+
+                # Add sort options
+                def sort_samples(samples, sort_by):
+                    if sort_by == "00000 ➡️ 99999":
+                        return sorted(samples, key=lambda x: x.rsplit(' ', 1)[0])
+                    elif sort_by == "99999 ➡️ 00000":
+                        return sorted(samples, key=lambda x: x.rsplit(' ', 1)[0], reverse=True)
+                    elif sort_by == "Recientes primero":
+                        return sorted(samples, key=lambda x: x.split("Fecha: ")[-1].strip(), reverse=True)
+                    elif sort_by == "Antiguos primero":
+                        return sorted(samples, key=lambda x: x.split("Fecha: ")[-1].strip())
+                    elif sort_by == "Editor":
+                        return sorted(samples, key=lambda x: x.split("Editor: ")[-1].split(",")[0].strip())
+                    return samples    
+                
+                with col2:
+                    sort_option = st.selectbox(
+                        "Ordenamiento:",
+                        options=["00000 ➡️ 99999",
+                                "99999 ➡️ 00000", 
+                                "Recientes primero", 
+                                "Antiguos primero", 
+                                "Editor"],
+                        index=0,
+                        help="Selecciona el criterio para ordenar las muestras:\n"
+                            "- 00000 ➡️ 99999: Orden ascendente por número.\n"
+                            "- 99999 ➡️ 00000: Orden descendente por número.\n"
+                            "- Recientes primero: Orden por fecha de modificación más reciente.\n"
+                            "- Antiguos primero: Orden por fecha de modificación más antigua.\n"
+                            "- Editor: Orden alfabético por nombre del editor."
+                    )
 
                 # Add range filter
                 with col3:
